@@ -183,7 +183,7 @@ ubuntu-advantage-tools==8001
 ubuntu-drivers-common==0.0.0
 ufw==0.36
 unattended-upgrades==0.1
-urllib3==1.25.8
+urllib3==1.26.19
 wadllib==1.3.3
 WALinuxAgent==2.2.46
 webencodings==0.5.1
