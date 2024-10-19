@@ -22,7 +22,7 @@ command-not-found==0.3
 configobj==5.0.6
 constantly==15.1.0
 contourpy==1.1.1
-cryptography==2.8
+cryptography==43.0.1
 cupshelpers==1.0
 cycler==0.12.1
 dataclasses-json==0.6.7
