@@ -105,7 +105,7 @@ nvidia-nccl-cu12==2.20.5
 nvidia-nvjitlink-cu12==12.6.68
 nvidia-nvtx-cu12==12.1.105
 oauthlib==3.1.0
-onnx==1.16.2
+onnx==1.17.0
 onnxruntime==1.16.3
 optimum==1.22.0
 orjson==3.10.7
