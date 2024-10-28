@@ -42,7 +42,7 @@ class LlamaSkipMLP(nn.Module):
         self.config = config
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
-        self.lora_size = int(config.intermediate_size * 0.2)
+        self.lora_size = int(config.intermediate_size * 0.04)
         self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=config.mlp_bias)
         self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=config.mlp_bias)
         self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias=config.mlp_bias)
@@ -75,15 +75,17 @@ class LlamaSkipMLP(nn.Module):
             down_proj = sum(down_proj)
         else:
             unsqueezeX= x.view(-1,x.shape[-1])
-            # mask_indices = self.mask.repeat(unsqueezeX.shape[0],1).nonzero()
             mask = (self.lora_gate_proj(unsqueezeX) * self.mask).to(torch.bool)
             down_proj = []
             for i in range(x.shape[0]):
-                down_proj.append((
+                # This down_proj is causing the issue, directly adding down_proj.append(torch.zeros()) also works fine
+                intermediary_tensor = (
                         self.act_fn(unsqueezeX[i,:]@self.gate_proj.weight[mask[i,:],:].t())
                         * (unsqueezeX[i,:]@self.up_proj.weight[mask[i,:],:].t())
                     )@self.down_proj.weight[:,mask[i,:]].t()
-                )
+                torch._dynamo.mark_dynamic(intermediary_tensor, 0, 2048) # This should work, but not working
+                # intermediary_tensor = torch.zeros([2048])
+                down_proj.append(intermediary_tensor)
             down_proj = torch.cat(down_proj)
             if self.config.mlp_bias:
                 down_proj += self.down_proj.bias
