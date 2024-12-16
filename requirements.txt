@@ -19,7 +19,7 @@ cloud-init==24.2
 colorama==0.4.3
 coloredlogs==15.0.1
 command-not-found==0.3
-configobj==5.0.6
+configobj==5.0.9
 constantly==15.1.0
 contourpy==1.1.1
 cryptography==2.8
