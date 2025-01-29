@@ -131,7 +131,7 @@ class LlamaSkipDecoderLayer(LlamaDecoderLayer):
             config.intermediate_size,
             dtype=torch.bool
         ).contiguous())
-        self.mlp_mask[:int(config.intermediate_size * 0.2)] = True  # 20% sparsity
+        self.mlp_mask[:int(config.intermediate_size * 0.05)] = True  # 5% sparsity
         
         # Create LoRA projection
         self.lora_size = int(config.intermediate_size * 0.04)
@@ -153,31 +153,24 @@ class LlamaSkipDecoderLayer(LlamaDecoderLayer):
         **kwargs,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         # Layernorm timing
-        global_timer.start_timer()
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
-        global_timer.stop_timer('layernorm')
         
         # Reshape hidden states for batch processing
         hidden_states_reshaped = hidden_states.view(-1, hidden_states.shape[-1]).to(torch.float32)
         
         # LoRA projection timing
-        global_timer.start_timer()
         lora_proj_mask = self.mlp_lora_proj(hidden_states_reshaped, self.mlp_mask)
-        global_timer.stop_timer('lora_proj')
         
         # Compute weights timing
-        global_timer.start_timer()
         compute_active_weights(
             self.mlp.gate_proj.weight.detach(),
             self.mlp.up_proj.weight.detach(),
             self.mlp.down_proj.weight.detach(),
             lora_proj_mask
         )
-        global_timer.stop_timer('compute_weights')
         
         # Attention timing
-        global_timer.start_timer()
         hidden_states, self_attn_weights, present_key_value = self.self_attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
@@ -188,17 +181,14 @@ class LlamaSkipDecoderLayer(LlamaDecoderLayer):
             cache_position=cache_position,
             **kwargs,
         )
-        global_timer.stop_timer('attention')
         
         hidden_states = residual + hidden_states
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
         
         # Pass through MLP
-        global_timer.start_timer()
         hidden_states = self.mlp(hidden_states.view(-1, hidden_states.shape[-1]))
         hidden_states = hidden_states.view(residual.shape)
-        global_timer.stop_timer('mlp')
         
         hidden_states = residual + hidden_states
         

@@ -106,16 +106,16 @@ llamaSkipScriptedPipe = pipeline(
     eos_token_id=tokenizer.eos_token_id
 )
 
-# llamaPipe = pipeline(
-#     "text-generation",
-#     device=device,
-#     model=checkpoint,
-#     tokenizer=tokenizer,
-#     max_new_tokens = 1000,
-#     eos_token_id=tokenizer.eos_token_id
-# )
+llamaPipe = pipeline(
+    "text-generation",
+    device=device,
+    model=checkpoint,
+    tokenizer=tokenizer,
+    max_new_tokens = 1000,
+    eos_token_id=tokenizer.eos_token_id
+)
 
-# llamaPipe.model.to(torch.float32)
+llamaPipe.model.to(torch.float32)
 # llamaSkipPipe.model.to(torch.float32)
 llamaSkipScriptedPipe.model.to(torch.float32)
 
@@ -193,13 +193,13 @@ print("-" * 50)
 
 # Warm up runs
 print("Warming up models...")
-# _ = run_inference(llamaPipe.model, input_ids, attention_mask, tokenizer, num_runs=2)
+_ = run_inference(llamaPipe.model, input_ids, attention_mask, tokenizer, num_runs=2)
 # _ = run_inference(llamaSkipPipe.model, input_ids, attention_mask, tokenizer, num_runs=2)
 _ = run_inference(llamaSkipScriptedPipe.model, input_ids, attention_mask, tokenizer, num_runs=2)
 
 # Actual benchmarks
 skip_scripted_times = run_inference(llamaSkipScriptedPipe.model, input_ids, attention_mask, tokenizer)
-# std_times = run_inference(llamaPipe.model, input_ids, attention_mask, tokenizer)
+std_times = run_inference(llamaPipe.model, input_ids, attention_mask, tokenizer)
 # skip_times = run_inference(llamaSkipPipe.model, input_ids, attention_mask, tokenizer)
 
 print_results = lambda name, times: (
@@ -213,9 +213,9 @@ print_results = lambda name, times: (
 calc_speedup = lambda t1, t2: (sum(t1)/len(t1))/(sum(t2)/len(t2))
 
 print_results("SkipLLaMA Scripted", skip_scripted_times)
-# print_results("Standard LLaMA", std_times)
+print_results("Standard LLaMA", std_times)
 # print_results("SkipLLaMA", skip_times)
-# print("\nCPU Speedups:")
-# print(f"Scripted vs Standard: {calc_speedup(std_times, skip_scripted_times):.2f}x")
+print("\nCPU Speedups:")
+print(f"Scripted vs Standard: {calc_speedup(std_times, skip_scripted_times):.2f}x")
 # print(f"SkipLLaMA vs Standard: {calc_speedup(std_times, skip_times):.2f}x")
 # print(f"SkipLLaMA vs Scripted: {calc_speedup(skip_times, skip_scripted_times):.2f}x")

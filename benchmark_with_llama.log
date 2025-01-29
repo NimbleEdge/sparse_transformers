@@ -1,0 +1,3275 @@
+Some weights of LlamaSkipConnectionForCausalLM were not initialized from the model checkpoint at meta-llama/Llama-3.2-1B-Instruct and are newly initialized: ['model.layers.0.mlp_lora_proj.down.weight', 'model.layers.0.mlp_lora_proj.intermediate', 'model.layers.0.mlp_lora_proj.output', 'model.layers.0.mlp_lora_proj.up.weight', 'model.layers.0.mlp_mask', 'model.layers.1.mlp_lora_proj.down.weight', 'model.layers.1.mlp_lora_proj.intermediate', 'model.layers.1.mlp_lora_proj.output', 'model.layers.1.mlp_lora_proj.up.weight', 'model.layers.1.mlp_mask', 'model.layers.10.mlp_lora_proj.down.weight', 'model.layers.10.mlp_lora_proj.intermediate', 'model.layers.10.mlp_lora_proj.output', 'model.layers.10.mlp_lora_proj.up.weight', 'model.layers.10.mlp_mask', 'model.layers.11.mlp_lora_proj.down.weight', 'model.layers.11.mlp_lora_proj.intermediate', 'model.layers.11.mlp_lora_proj.output', 'model.layers.11.mlp_lora_proj.up.weight', 'model.layers.11.mlp_mask', 'model.layers.12.mlp_lora_proj.down.weight', 'model.layers.12.mlp_lora_proj.intermediate', 'model.layers.12.mlp_lora_proj.output', 'model.layers.12.mlp_lora_proj.up.weight', 'model.layers.12.mlp_mask', 'model.layers.13.mlp_lora_proj.down.weight', 'model.layers.13.mlp_lora_proj.intermediate', 'model.layers.13.mlp_lora_proj.output', 'model.layers.13.mlp_lora_proj.up.weight', 'model.layers.13.mlp_mask', 'model.layers.14.mlp_lora_proj.down.weight', 'model.layers.14.mlp_lora_proj.intermediate', 'model.layers.14.mlp_lora_proj.output', 'model.layers.14.mlp_lora_proj.up.weight', 'model.layers.14.mlp_mask', 'model.layers.15.mlp_lora_proj.down.weight', 'model.layers.15.mlp_lora_proj.intermediate', 'model.layers.15.mlp_lora_proj.output', 'model.layers.15.mlp_lora_proj.up.weight', 'model.layers.15.mlp_mask', 'model.layers.2.mlp_lora_proj.down.weight', 'model.layers.2.mlp_lora_proj.intermediate', 'model.layers.2.mlp_lora_proj.output', 'model.layers.2.mlp_lora_proj.up.weight', 'model.layers.2.mlp_mask', 'model.layers.3.mlp_lora_proj.down.weight', 'model.layers.3.mlp_lora_proj.intermediate', 'model.layers.3.mlp_lora_proj.output', 'model.layers.3.mlp_lora_proj.up.weight', 'model.layers.3.mlp_mask', 'model.layers.4.mlp_lora_proj.down.weight', 'model.layers.4.mlp_lora_proj.intermediate', 'model.layers.4.mlp_lora_proj.output', 'model.layers.4.mlp_lora_proj.up.weight', 'model.layers.4.mlp_mask', 'model.layers.5.mlp_lora_proj.down.weight', 'model.layers.5.mlp_lora_proj.intermediate', 'model.layers.5.mlp_lora_proj.output', 'model.layers.5.mlp_lora_proj.up.weight', 'model.layers.5.mlp_mask', 'model.layers.6.mlp_lora_proj.down.weight', 'model.layers.6.mlp_lora_proj.intermediate', 'model.layers.6.mlp_lora_proj.output', 'model.layers.6.mlp_lora_proj.up.weight', 'model.layers.6.mlp_mask', 'model.layers.7.mlp_lora_proj.down.weight', 'model.layers.7.mlp_lora_proj.intermediate', 'model.layers.7.mlp_lora_proj.output', 'model.layers.7.mlp_lora_proj.up.weight', 'model.layers.7.mlp_mask', 'model.layers.8.mlp_lora_proj.down.weight', 'model.layers.8.mlp_lora_proj.intermediate', 'model.layers.8.mlp_lora_proj.output', 'model.layers.8.mlp_lora_proj.up.weight', 'model.layers.8.mlp_mask', 'model.layers.9.mlp_lora_proj.down.weight', 'model.layers.9.mlp_lora_proj.intermediate', 'model.layers.9.mlp_lora_proj.output', 'model.layers.9.mlp_lora_proj.up.weight', 'model.layers.9.mlp_mask']
+You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
+Configuring for 8 CPU threads
+Loading models...
+
+Running CPU inference benchmarks...
+--------------------------------------------------
+Warming up models...
+
+Run 1 timing breakdown:
+
+Global Component Timing Statistics:
+
+LlamaForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 25.659ms
+  Min: 25.659ms
+  Max: 25.659ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 1:
+  Avg: 23.667ms
+  Min: 23.667ms
+  Max: 23.667ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 2:
+  Avg: 23.396ms
+  Min: 23.396ms
+  Max: 23.396ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 3:
+  Avg: 23.513ms
+  Min: 23.513ms
+  Max: 23.513ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 4:
+  Avg: 23.584ms
+  Min: 23.584ms
+  Max: 23.584ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 5:
+  Avg: 23.991ms
+  Min: 23.991ms
+  Max: 23.991ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 6:
+  Avg: 23.814ms
+  Min: 23.814ms
+  Max: 23.814ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 7:
+  Avg: 23.701ms
+  Min: 23.701ms
+  Max: 23.701ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 8:
+  Avg: 23.711ms
+  Min: 23.711ms
+  Max: 23.711ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 9:
+  Avg: 23.535ms
+  Min: 23.535ms
+  Max: 23.535ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 10:
+  Avg: 23.817ms
+  Min: 23.817ms
+  Max: 23.817ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 11:
+  Avg: 23.501ms
+  Min: 23.501ms
+  Max: 23.501ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 12:
+  Avg: 23.495ms
+  Min: 23.495ms
+  Max: 23.495ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 13:
+  Avg: 23.540ms
+  Min: 23.540ms
+  Max: 23.540ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 14:
+  Avg: 23.524ms
+  Min: 23.524ms
+  Max: 23.524ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 15:
+  Avg: 23.363ms
+  Min: 23.363ms
+  Max: 23.363ms
+  Std: 0.000ms
+  Count: 1
+
+Run 2 timing breakdown:
+
+Global Component Timing Statistics:
+
+LlamaForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 25.190ms
+  Min: 24.721ms
+  Max: 25.659ms
+  Std: 0.469ms
+  Count: 2
+
+Layer 1:
+  Avg: 23.808ms
+  Min: 23.667ms
+  Max: 23.949ms
+  Std: 0.141ms
+  Count: 2
+
+Layer 2:
+  Avg: 23.623ms
+  Min: 23.396ms
+  Max: 23.849ms
+  Std: 0.227ms
+  Count: 2
+
+Layer 3:
+  Avg: 23.281ms
+  Min: 23.049ms
+  Max: 23.513ms
+  Std: 0.232ms
+  Count: 2
+
+Layer 4:
+  Avg: 34.220ms
+  Min: 23.584ms
+  Max: 44.856ms
+  Std: 10.636ms
+  Count: 2
+
+Layer 5:
+  Avg: 36.419ms
+  Min: 23.991ms
+  Max: 48.847ms
+  Std: 12.428ms
+  Count: 2
+
+Layer 6:
+  Avg: 30.185ms
+  Min: 23.814ms
+  Max: 36.556ms
+  Std: 6.371ms
+  Count: 2
+
+Layer 7:
+  Avg: 30.147ms
+  Min: 23.701ms
+  Max: 36.594ms
+  Std: 6.446ms
+  Count: 2
+
+Layer 8:
+  Avg: 27.620ms
+  Min: 23.711ms
+  Max: 31.528ms
+  Std: 3.909ms
+  Count: 2
+
+Layer 9:
+  Avg: 23.571ms
+  Min: 23.535ms
+  Max: 23.607ms
+  Std: 0.036ms
+  Count: 2
+
+Layer 10:
+  Avg: 23.502ms
+  Min: 23.187ms
+  Max: 23.817ms
+  Std: 0.315ms
+  Count: 2
+
+Layer 11:
+  Avg: 23.463ms
+  Min: 23.425ms
+  Max: 23.501ms
+  Std: 0.038ms
+  Count: 2
+
+Layer 12:
+  Avg: 23.519ms
+  Min: 23.495ms
+  Max: 23.544ms
+  Std: 0.024ms
+  Count: 2
+
+Layer 13:
+  Avg: 23.861ms
+  Min: 23.540ms
+  Max: 24.182ms
+  Std: 0.321ms
+  Count: 2
+
+Layer 14:
+  Avg: 24.317ms
+  Min: 23.524ms
+  Max: 25.111ms
+  Std: 0.794ms
+  Count: 2
+
+Layer 15:
+  Avg: 23.285ms
+  Min: 23.206ms
+  Max: 23.363ms
+  Std: 0.078ms
+  Count: 2
+
+Run 1 timing breakdown:
+
+Global Component Timing Statistics:
+
+attention:
+  Avg: 4.693ms
+  Min: 3.290ms
+  Max: 13.857ms
+  Total: 75.093ms
+  Count: 16
+
+lora_proj:
+  Avg: 4.533ms
+  Min: 0.225ms
+  Max: 45.484ms
+  Total: 72.532ms
+  Count: 16
+
+mlp:
+  Avg: 46.798ms
+  Min: 13.198ms
+  Max: 79.061ms
+  Total: 748.767ms
+  Count: 16
+
+layernorm:
+  Avg: 0.201ms
+  Min: 0.181ms
+  Max: 0.319ms
+  Total: 3.213ms
+  Count: 16
+
+LlamaSkipConnectionForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 382.725ms
+  Min: 382.725ms
+  Max: 382.725ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 1:
+  Avg: 30.363ms
+  Min: 30.363ms
+  Max: 30.363ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 2:
+  Avg: 54.232ms
+  Min: 54.232ms
+  Max: 54.232ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 3:
+  Avg: 30.305ms
+  Min: 30.305ms
+  Max: 30.305ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 4:
+  Avg: 78.530ms
+  Min: 78.530ms
+  Max: 78.530ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 5:
+  Avg: 48.156ms
+  Min: 48.156ms
+  Max: 48.156ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 6:
+  Avg: 45.571ms
+  Min: 45.571ms
+  Max: 45.571ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 7:
+  Avg: 72.087ms
+  Min: 72.087ms
+  Max: 72.087ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 8:
+  Avg: 87.854ms
+  Min: 87.854ms
+  Max: 87.854ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 9:
+  Avg: 39.646ms
+  Min: 39.646ms
+  Max: 39.646ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 10:
+  Avg: 43.509ms
+  Min: 43.509ms
+  Max: 43.509ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 11:
+  Avg: 45.880ms
+  Min: 45.880ms
+  Max: 45.880ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 12:
+  Avg: 79.257ms
+  Min: 79.257ms
+  Max: 79.257ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 13:
+  Avg: 64.691ms
+  Min: 64.691ms
+  Max: 64.691ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 14:
+  Avg: 18.079ms
+  Min: 18.079ms
+  Max: 18.079ms
+  Std: 0.000ms
+  Count: 1
+
+Layer 15:
+  Avg: 40.984ms
+  Min: 40.984ms
+  Max: 40.984ms
+  Std: 0.000ms
+  Count: 1
+
+Run 2 timing breakdown:
+
+Global Component Timing Statistics:
+
+attention:
+  Avg: 3.615ms
+  Min: 3.105ms
+  Max: 4.742ms
+  Total: 57.838ms
+  Count: 16
+
+lora_proj:
+  Avg: 0.124ms
+  Min: 0.115ms
+  Max: 0.133ms
+  Total: 1.982ms
+  Count: 16
+
+mlp:
+  Avg: 48.070ms
+  Min: 13.263ms
+  Max: 74.187ms
+  Total: 769.112ms
+  Count: 16
+
+layernorm:
+  Avg: 0.184ms
+  Min: 0.165ms
+  Max: 0.203ms
+  Total: 2.944ms
+  Count: 16
+
+LlamaSkipConnectionForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 231.556ms
+  Min: 80.387ms
+  Max: 382.725ms
+  Std: 151.169ms
+  Count: 2
+
+Layer 1:
+  Avg: 25.462ms
+  Min: 20.561ms
+  Max: 30.363ms
+  Std: 4.901ms
+  Count: 2
+
+Layer 2:
+  Avg: 54.276ms
+  Min: 54.232ms
+  Max: 54.320ms
+  Std: 0.044ms
+  Count: 2
+
+Layer 3:
+  Avg: 32.445ms
+  Min: 30.305ms
+  Max: 34.585ms
+  Std: 2.140ms
+  Count: 2
+
+Layer 4:
+  Avg: 78.714ms
+  Min: 78.530ms
+  Max: 78.898ms
+  Std: 0.184ms
+  Count: 2
+
+Layer 5:
+  Avg: 48.785ms
+  Min: 48.156ms
+  Max: 49.414ms
+  Std: 0.629ms
+  Count: 2
+
+Layer 6:
+  Avg: 43.620ms
+  Min: 41.670ms
+  Max: 45.571ms
+  Std: 1.950ms
+  Count: 2
+
+Layer 7:
+  Avg: 74.289ms
+  Min: 72.087ms
+  Max: 76.491ms
+  Std: 2.202ms
+  Count: 2
+
+Layer 8:
+  Avg: 78.614ms
+  Min: 69.375ms
+  Max: 87.854ms
+  Std: 9.239ms
+  Count: 2
+
+Layer 9:
+  Avg: 43.028ms
+  Min: 39.646ms
+  Max: 46.411ms
+  Std: 3.382ms
+  Count: 2
+
+Layer 10:
+  Avg: 45.626ms
+  Min: 43.509ms
+  Max: 47.744ms
+  Std: 2.117ms
+  Count: 2
+
+Layer 11:
+  Avg: 44.738ms
+  Min: 43.597ms
+  Max: 45.880ms
+  Std: 1.141ms
+  Count: 2
+
+Layer 12:
+  Avg: 78.402ms
+  Min: 77.547ms
+  Max: 79.257ms
+  Std: 0.855ms
+  Count: 2
+
+Layer 13:
+  Avg: 64.120ms
+  Min: 63.549ms
+  Max: 64.691ms
+  Std: 0.571ms
+  Count: 2
+
+Layer 14:
+  Avg: 17.666ms
+  Min: 17.253ms
+  Max: 18.079ms
+  Std: 0.413ms
+  Count: 2
+
+Layer 15:
+  Avg: 41.422ms
+  Min: 40.984ms
+  Max: 41.861ms
+  Std: 0.438ms
+  Count: 2
+
+Standard LLaMA Benchmark:
+
+Run 1 timing breakdown:
+
+Global Component Timing Statistics:
+
+LlamaForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 24.768ms
+  Min: 23.924ms
+  Max: 25.659ms
+  Std: 0.709ms
+  Count: 3
+
+Layer 1:
+  Avg: 23.608ms
+  Min: 23.209ms
+  Max: 23.949ms
+  Std: 0.305ms
+  Count: 3
+
+Layer 2:
+  Avg: 23.460ms
+  Min: 23.134ms
+  Max: 23.849ms
+  Std: 0.295ms
+  Count: 3
+
+Layer 3:
+  Avg: 23.220ms
+  Min: 23.049ms
+  Max: 23.513ms
+  Std: 0.208ms
+  Count: 3
+
+Layer 4:
+  Avg: 30.513ms
+  Min: 23.100ms
+  Max: 44.856ms
+  Std: 10.144ms
+  Count: 3
+
+Layer 5:
+  Avg: 31.968ms
+  Min: 23.067ms
+  Max: 48.847ms
+  Std: 11.941ms
+  Count: 3
+
+Layer 6:
+  Avg: 27.972ms
+  Min: 23.547ms
+  Max: 36.556ms
+  Std: 6.070ms
+  Count: 3
+
+Layer 7:
+  Avg: 27.968ms
+  Min: 23.608ms
+  Max: 36.594ms
+  Std: 6.100ms
+  Count: 3
+
+Layer 8:
+  Avg: 26.142ms
+  Min: 23.187ms
+  Max: 31.528ms
+  Std: 3.815ms
+  Count: 3
+
+Layer 9:
+  Avg: 23.579ms
+  Min: 23.535ms
+  Max: 23.607ms
+  Std: 0.031ms
+  Count: 3
+
+Layer 10:
+  Avg: 23.627ms
+  Min: 23.187ms
+  Max: 23.877ms
+  Std: 0.312ms
+  Count: 3
+
+Layer 11:
+  Avg: 23.524ms
+  Min: 23.425ms
+  Max: 23.645ms
+  Std: 0.091ms
+  Count: 3
+
+Layer 12:
+  Avg: 23.488ms
+  Min: 23.426ms
+  Max: 23.544ms
+  Std: 0.048ms
+  Count: 3
+
+Layer 13:
+  Avg: 23.683ms
+  Min: 23.326ms
+  Max: 24.182ms
+  Std: 0.364ms
+  Count: 3
+
+Layer 14:
+  Avg: 23.990ms
+  Min: 23.335ms
+  Max: 25.111ms
+  Std: 0.797ms
+  Count: 3
+
+Layer 15:
+  Avg: 23.282ms
+  Min: 23.206ms
+  Max: 23.363ms
+  Std: 0.064ms
+  Count: 3
+
+Run 2 timing breakdown:
+
+Global Component Timing Statistics:
+
+LlamaForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 24.618ms
+  Min: 23.924ms
+  Max: 25.659ms
+  Std: 0.667ms
+  Count: 4
+
+Layer 1:
+  Avg: 23.596ms
+  Min: 23.209ms
+  Max: 23.949ms
+  Std: 0.265ms
+  Count: 4
+
+Layer 2:
+  Avg: 23.561ms
+  Min: 23.134ms
+  Max: 23.863ms
+  Std: 0.310ms
+  Count: 4
+
+Layer 3:
+  Avg: 23.262ms
+  Min: 23.049ms
+  Max: 23.513ms
+  Std: 0.194ms
+  Count: 4
+
+Layer 4:
+  Avg: 28.719ms
+  Min: 23.100ms
+  Max: 44.856ms
+  Std: 9.318ms
+  Count: 4
+
+Layer 5:
+  Avg: 29.784ms
+  Min: 23.067ms
+  Max: 48.847ms
+  Std: 11.011ms
+  Count: 4
+
+Layer 6:
+  Avg: 26.862ms
+  Min: 23.531ms
+  Max: 36.556ms
+  Std: 5.598ms
+  Count: 4
+
+Layer 7:
+  Avg: 26.905ms
+  Min: 23.608ms
+  Max: 36.594ms
+  Std: 5.594ms
+  Count: 4
+
+Layer 8:
+  Avg: 25.582ms
+  Min: 23.187ms
+  Max: 31.528ms
+  Std: 3.443ms
+  Count: 4
+
+Layer 9:
+  Avg: 23.649ms
+  Min: 23.535ms
+  Max: 23.860ms
+  Std: 0.125ms
+  Count: 4
+
+Layer 10:
+  Avg: 23.570ms
+  Min: 23.187ms
+  Max: 23.877ms
+  Std: 0.288ms
+  Count: 4
+
+Layer 11:
+  Avg: 23.531ms
+  Min: 23.425ms
+  Max: 23.645ms
+  Std: 0.080ms
+  Count: 4
+
+Layer 12:
+  Avg: 23.516ms
+  Min: 23.426ms
+  Max: 23.599ms
+  Std: 0.064ms
+  Count: 4
+
+Layer 13:
+  Avg: 23.592ms
+  Min: 23.318ms
+  Max: 24.182ms
+  Std: 0.352ms
+  Count: 4
+
+Layer 14:
+  Avg: 23.815ms
+  Min: 23.290ms
+  Max: 25.111ms
+  Std: 0.754ms
+  Count: 4
+
+Layer 15:
+  Avg: 23.266ms
+  Min: 23.206ms
+  Max: 23.363ms
+  Std: 0.062ms
+  Count: 4
+
+Run 3 timing breakdown:
+
+Global Component Timing Statistics:
+
+LlamaForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 24.564ms
+  Min: 23.924ms
+  Max: 25.659ms
+  Std: 0.606ms
+  Count: 5
+
+Layer 1:
+  Avg: 23.539ms
+  Min: 23.209ms
+  Max: 23.949ms
+  Std: 0.263ms
+  Count: 5
+
+Layer 2:
+  Avg: 23.522ms
+  Min: 23.134ms
+  Max: 23.863ms
+  Std: 0.287ms
+  Count: 5
+
+Layer 3:
+  Avg: 23.405ms
+  Min: 23.049ms
+  Max: 23.974ms
+  Std: 0.334ms
+  Count: 5
+
+Layer 4:
+  Avg: 27.601ms
+  Min: 23.100ms
+  Max: 44.856ms
+  Std: 8.629ms
+  Count: 5
+
+Layer 5:
+  Avg: 28.769ms
+  Min: 23.067ms
+  Max: 48.847ms
+  Std: 10.056ms
+  Count: 5
+
+Layer 6:
+  Avg: 26.277ms
+  Min: 23.531ms
+  Max: 36.556ms
+  Std: 5.142ms
+  Count: 5
+
+Layer 7:
+  Avg: 26.433ms
+  Min: 23.608ms
+  Max: 36.594ms
+  Std: 5.092ms
+  Count: 5
+
+Layer 8:
+  Avg: 25.142ms
+  Min: 23.187ms
+  Max: 31.528ms
+  Std: 3.203ms
+  Count: 5
+
+Layer 9:
+  Avg: 23.636ms
+  Min: 23.535ms
+  Max: 23.860ms
+  Std: 0.115ms
+  Count: 5
+
+Layer 10:
+  Avg: 23.550ms
+  Min: 23.187ms
+  Max: 23.877ms
+  Std: 0.260ms
+  Count: 5
+
+Layer 11:
+  Avg: 23.511ms
+  Min: 23.425ms
+  Max: 23.645ms
+  Std: 0.081ms
+  Count: 5
+
+Layer 12:
+  Avg: 23.521ms
+  Min: 23.426ms
+  Max: 23.599ms
+  Std: 0.058ms
+  Count: 5
+
+Layer 13:
+  Avg: 23.595ms
+  Min: 23.318ms
+  Max: 24.182ms
+  Std: 0.315ms
+  Count: 5
+
+Layer 14:
+  Avg: 23.756ms
+  Min: 23.290ms
+  Max: 25.111ms
+  Std: 0.684ms
+  Count: 5
+
+Layer 15:
+  Avg: 23.321ms
+  Min: 23.206ms
+  Max: 23.539ms
+  Std: 0.122ms
+  Count: 5
+
+Run 4 timing breakdown:
+
+Global Component Timing Statistics:
+
+LlamaForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 24.503ms
+  Min: 23.924ms
+  Max: 25.659ms
+  Std: 0.570ms
+  Count: 6
+
+Layer 1:
+  Avg: 23.518ms
+  Min: 23.209ms
+  Max: 23.949ms
+  Std: 0.245ms
+  Count: 6
+
+Layer 2:
+  Avg: 23.517ms
+  Min: 23.134ms
+  Max: 23.863ms
+  Std: 0.263ms
+  Count: 6
+
+Layer 3:
+  Avg: 23.447ms
+  Min: 23.049ms
+  Max: 23.974ms
+  Std: 0.319ms
+  Count: 6
+
+Layer 4:
+  Avg: 26.895ms
+  Min: 23.100ms
+  Max: 44.856ms
+  Std: 8.034ms
+  Count: 6
+
+Layer 5:
+  Avg: 27.911ms
+  Min: 23.067ms
+  Max: 48.847ms
+  Std: 9.378ms
+  Count: 6
+
+Layer 6:
+  Avg: 25.834ms
+  Min: 23.531ms
+  Max: 36.556ms
+  Std: 4.797ms
+  Count: 6
+
+Layer 7:
+  Avg: 25.937ms
+  Min: 23.458ms
+  Max: 36.594ms
+  Std: 4.778ms
+  Count: 6
+
+Layer 8:
+  Avg: 24.890ms
+  Min: 23.187ms
+  Max: 31.528ms
+  Std: 2.978ms
+  Count: 6
+
+Layer 9:
+  Avg: 23.647ms
+  Min: 23.535ms
+  Max: 23.860ms
+  Std: 0.108ms
+  Count: 6
+
+Layer 10:
+  Avg: 23.520ms
+  Min: 23.187ms
+  Max: 23.877ms
+  Std: 0.247ms
+  Count: 6
+
+Layer 11:
+  Avg: 23.548ms
+  Min: 23.425ms
+  Max: 23.731ms
+  Std: 0.110ms
+  Count: 6
+
+Layer 12:
+  Avg: 23.529ms
+  Min: 23.426ms
+  Max: 23.599ms
+  Std: 0.056ms
+  Count: 6
+
+Layer 13:
+  Avg: 23.587ms
+  Min: 23.318ms
+  Max: 24.182ms
+  Std: 0.288ms
+  Count: 6
+
+Layer 14:
+  Avg: 23.758ms
+  Min: 23.290ms
+  Max: 25.111ms
+  Std: 0.625ms
+  Count: 6
+
+Layer 15:
+  Avg: 23.392ms
+  Min: 23.206ms
+  Max: 23.748ms
+  Std: 0.194ms
+  Count: 6
+
+Run 5 timing breakdown:
+
+Global Component Timing Statistics:
+
+LlamaForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 24.458ms
+  Min: 23.924ms
+  Max: 25.659ms
+  Std: 0.539ms
+  Count: 7
+
+Layer 1:
+  Avg: 23.505ms
+  Min: 23.209ms
+  Max: 23.949ms
+  Std: 0.228ms
+  Count: 7
+
+Layer 2:
+  Avg: 23.497ms
+  Min: 23.134ms
+  Max: 23.863ms
+  Std: 0.248ms
+  Count: 7
+
+Layer 3:
+  Avg: 23.446ms
+  Min: 23.049ms
+  Max: 23.974ms
+  Std: 0.295ms
+  Count: 7
+
+Layer 4:
+  Avg: 26.470ms
+  Min: 23.100ms
+  Max: 44.856ms
+  Std: 7.510ms
+  Count: 7
+
+Layer 5:
+  Avg: 27.262ms
+  Min: 23.067ms
+  Max: 48.847ms
+  Std: 8.827ms
+  Count: 7
+
+Layer 6:
+  Avg: 25.505ms
+  Min: 23.530ms
+  Max: 36.556ms
+  Std: 4.514ms
+  Count: 7
+
+Layer 7:
+  Avg: 25.611ms
+  Min: 23.458ms
+  Max: 36.594ms
+  Std: 4.495ms
+  Count: 7
+
+Layer 8:
+  Avg: 24.736ms
+  Min: 23.187ms
+  Max: 31.528ms
+  Std: 2.782ms
+  Count: 7
+
+Layer 9:
+  Avg: 23.632ms
+  Min: 23.535ms
+  Max: 23.860ms
+  Std: 0.107ms
+  Count: 7
+
+Layer 10:
+  Avg: 23.563ms
+  Min: 23.187ms
+  Max: 23.877ms
+  Std: 0.251ms
+  Count: 7
+
+Layer 11:
+  Avg: 23.528ms
+  Min: 23.409ms
+  Max: 23.731ms
+  Std: 0.113ms
+  Count: 7
+
+Layer 12:
+  Avg: 23.528ms
+  Min: 23.426ms
+  Max: 23.599ms
+  Std: 0.052ms
+  Count: 7
+
+Layer 13:
+  Avg: 23.630ms
+  Min: 23.318ms
+  Max: 24.182ms
+  Std: 0.287ms
+  Count: 7
+
+Layer 14:
+  Avg: 23.726ms
+  Min: 23.290ms
+  Max: 25.111ms
+  Std: 0.584ms
+  Count: 7
+
+Layer 15:
+  Avg: 23.475ms
+  Min: 23.206ms
+  Max: 23.972ms
+  Std: 0.271ms
+  Count: 7
+
+Run 6 timing breakdown:
+
+Global Component Timing Statistics:
+
+LlamaForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 24.507ms
+  Min: 23.924ms
+  Max: 25.659ms
+  Std: 0.520ms
+  Count: 8
+
+Layer 1:
+  Avg: 23.519ms
+  Min: 23.209ms
+  Max: 23.949ms
+  Std: 0.217ms
+  Count: 8
+
+Layer 2:
+  Avg: 23.506ms
+  Min: 23.134ms
+  Max: 23.863ms
+  Std: 0.233ms
+  Count: 8
+
+Layer 3:
+  Avg: 23.436ms
+  Min: 23.049ms
+  Max: 23.974ms
+  Std: 0.278ms
+  Count: 8
+
+Layer 4:
+  Avg: 26.064ms
+  Min: 23.100ms
+  Max: 44.856ms
+  Std: 7.107ms
+  Count: 8
+
+Layer 5:
+  Avg: 26.810ms
+  Min: 23.067ms
+  Max: 48.847ms
+  Std: 8.343ms
+  Count: 8
+
+Layer 6:
+  Avg: 28.084ms
+  Min: 23.530ms
+  Max: 46.135ms
+  Std: 8.024ms
+  Count: 8
+
+Layer 7:
+  Avg: 28.541ms
+  Min: 23.458ms
+  Max: 49.048ms
+  Std: 8.818ms
+  Count: 8
+
+Layer 8:
+  Avg: 25.538ms
+  Min: 23.187ms
+  Max: 31.528ms
+  Std: 3.358ms
+  Count: 8
+
+Layer 9:
+  Avg: 25.888ms
+  Min: 23.535ms
+  Max: 41.684ms
+  Std: 5.971ms
+  Count: 8
+
+Layer 10:
+  Avg: 24.634ms
+  Min: 23.187ms
+  Max: 32.134ms
+  Std: 2.844ms
+  Count: 8
+
+Layer 11:
+  Avg: 23.690ms
+  Min: 23.409ms
+  Max: 24.823ms
+  Std: 0.441ms
+  Count: 8
+
+Layer 12:
+  Avg: 23.567ms
+  Min: 23.426ms
+  Max: 23.841ms
+  Std: 0.114ms
+  Count: 8
+
+Layer 13:
+  Avg: 23.634ms
+  Min: 23.318ms
+  Max: 24.182ms
+  Std: 0.269ms
+  Count: 8
+
+Layer 14:
+  Avg: 23.730ms
+  Min: 23.290ms
+  Max: 25.111ms
+  Std: 0.546ms
+  Count: 8
+
+Layer 15:
+  Avg: 23.492ms
+  Min: 23.206ms
+  Max: 23.972ms
+  Std: 0.258ms
+  Count: 8
+
+Run 7 timing breakdown:
+
+Global Component Timing Statistics:
+
+LlamaForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 24.445ms
+  Min: 23.924ms
+  Max: 25.659ms
+  Std: 0.520ms
+  Count: 9
+
+Layer 1:
+  Avg: 23.608ms
+  Min: 23.209ms
+  Max: 24.327ms
+  Std: 0.326ms
+  Count: 9
+
+Layer 2:
+  Avg: 23.564ms
+  Min: 23.134ms
+  Max: 24.027ms
+  Std: 0.274ms
+  Count: 9
+
+Layer 3:
+  Avg: 23.457ms
+  Min: 23.049ms
+  Max: 23.974ms
+  Std: 0.268ms
+  Count: 9
+
+Layer 4:
+  Avg: 25.764ms
+  Min: 23.100ms
+  Max: 44.856ms
+  Std: 6.754ms
+  Count: 9
+
+Layer 5:
+  Avg: 26.468ms
+  Min: 23.067ms
+  Max: 48.847ms
+  Std: 7.925ms
+  Count: 9
+
+Layer 6:
+  Avg: 31.963ms
+  Min: 23.530ms
+  Max: 62.998ms
+  Std: 13.327ms
+  Count: 9
+
+Layer 7:
+  Avg: 28.017ms
+  Min: 23.458ms
+  Max: 49.048ms
+  Std: 8.445ms
+  Count: 9
+
+Layer 8:
+  Avg: 25.348ms
+  Min: 23.187ms
+  Max: 31.528ms
+  Std: 3.211ms
+  Count: 9
+
+Layer 9:
+  Avg: 25.633ms
+  Min: 23.535ms
+  Max: 41.684ms
+  Std: 5.676ms
+  Count: 9
+
+Layer 10:
+  Avg: 24.514ms
+  Min: 23.187ms
+  Max: 32.134ms
+  Std: 2.703ms
+  Count: 9
+
+Layer 11:
+  Avg: 23.688ms
+  Min: 23.409ms
+  Max: 24.823ms
+  Std: 0.416ms
+  Count: 9
+
+Layer 12:
+  Avg: 23.580ms
+  Min: 23.426ms
+  Max: 23.841ms
+  Std: 0.114ms
+  Count: 9
+
+Layer 13:
+  Avg: 23.664ms
+  Min: 23.318ms
+  Max: 24.182ms
+  Std: 0.267ms
+  Count: 9
+
+Layer 14:
+  Avg: 23.750ms
+  Min: 23.290ms
+  Max: 25.111ms
+  Std: 0.518ms
+  Count: 9
+
+Layer 15:
+  Avg: 23.491ms
+  Min: 23.206ms
+  Max: 23.972ms
+  Std: 0.243ms
+  Count: 9
+
+Run 8 timing breakdown:
+
+Global Component Timing Statistics:
+
+LlamaForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 24.438ms
+  Min: 23.924ms
+  Max: 25.659ms
+  Std: 0.494ms
+  Count: 10
+
+Layer 1:
+  Avg: 23.711ms
+  Min: 23.209ms
+  Max: 24.638ms
+  Std: 0.437ms
+  Count: 10
+
+Layer 2:
+  Avg: 23.581ms
+  Min: 23.134ms
+  Max: 24.027ms
+  Std: 0.265ms
+  Count: 10
+
+Layer 3:
+  Avg: 23.474ms
+  Min: 23.049ms
+  Max: 23.974ms
+  Std: 0.259ms
+  Count: 10
+
+Layer 4:
+  Avg: 25.600ms
+  Min: 23.100ms
+  Max: 44.856ms
+  Std: 6.426ms
+  Count: 10
+
+Layer 5:
+  Avg: 26.226ms
+  Min: 23.067ms
+  Max: 48.847ms
+  Std: 7.553ms
+  Count: 10
+
+Layer 6:
+  Avg: 31.154ms
+  Min: 23.530ms
+  Max: 62.998ms
+  Std: 12.874ms
+  Count: 10
+
+Layer 7:
+  Avg: 27.568ms
+  Min: 23.458ms
+  Max: 49.048ms
+  Std: 8.124ms
+  Count: 10
+
+Layer 8:
+  Avg: 25.231ms
+  Min: 23.187ms
+  Max: 31.528ms
+  Std: 3.066ms
+  Count: 10
+
+Layer 9:
+  Avg: 25.653ms
+  Min: 23.535ms
+  Max: 41.684ms
+  Std: 5.385ms
+  Count: 10
+
+Layer 10:
+  Avg: 24.650ms
+  Min: 23.187ms
+  Max: 32.134ms
+  Std: 2.597ms
+  Count: 10
+
+Layer 11:
+  Avg: 25.367ms
+  Min: 23.409ms
+  Max: 40.474ms
+  Std: 5.051ms
+  Count: 10
+
+Layer 12:
+  Avg: 23.984ms
+  Min: 23.426ms
+  Max: 27.623ms
+  Std: 1.218ms
+  Count: 10
+
+Layer 13:
+  Avg: 23.812ms
+  Min: 23.318ms
+  Max: 25.146ms
+  Std: 0.512ms
+  Count: 10
+
+Layer 14:
+  Avg: 23.793ms
+  Min: 23.290ms
+  Max: 25.111ms
+  Std: 0.508ms
+  Count: 10
+
+Layer 15:
+  Avg: 23.528ms
+  Min: 23.206ms
+  Max: 23.972ms
+  Std: 0.256ms
+  Count: 10
+
+Run 9 timing breakdown:
+
+Global Component Timing Statistics:
+
+LlamaForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 24.491ms
+  Min: 23.924ms
+  Max: 25.659ms
+  Std: 0.500ms
+  Count: 11
+
+Layer 1:
+  Avg: 23.723ms
+  Min: 23.209ms
+  Max: 24.638ms
+  Std: 0.418ms
+  Count: 11
+
+Layer 2:
+  Avg: 23.583ms
+  Min: 23.134ms
+  Max: 24.027ms
+  Std: 0.253ms
+  Count: 11
+
+Layer 3:
+  Avg: 23.473ms
+  Min: 23.049ms
+  Max: 23.974ms
+  Std: 0.247ms
+  Count: 11
+
+Layer 4:
+  Avg: 25.412ms
+  Min: 23.100ms
+  Max: 44.856ms
+  Std: 6.156ms
+  Count: 11
+
+Layer 5:
+  Avg: 25.972ms
+  Min: 23.067ms
+  Max: 48.847ms
+  Std: 7.246ms
+  Count: 11
+
+Layer 6:
+  Avg: 30.431ms
+  Min: 23.200ms
+  Max: 62.998ms
+  Std: 12.486ms
+  Count: 11
+
+Layer 7:
+  Avg: 27.212ms
+  Min: 23.458ms
+  Max: 49.048ms
+  Std: 7.827ms
+  Count: 11
+
+Layer 8:
+  Avg: 25.065ms
+  Min: 23.187ms
+  Max: 31.528ms
+  Std: 2.970ms
+  Count: 11
+
+Layer 9:
+  Avg: 25.491ms
+  Min: 23.535ms
+  Max: 41.684ms
+  Std: 5.160ms
+  Count: 11
+
+Layer 10:
+  Avg: 24.563ms
+  Min: 23.187ms
+  Max: 32.134ms
+  Std: 2.491ms
+  Count: 11
+
+Layer 11:
+  Avg: 25.194ms
+  Min: 23.409ms
+  Max: 40.474ms
+  Std: 4.847ms
+  Count: 11
+
+Layer 12:
+  Avg: 23.990ms
+  Min: 23.426ms
+  Max: 27.623ms
+  Std: 1.161ms
+  Count: 11
+
+Layer 13:
+  Avg: 23.777ms
+  Min: 23.318ms
+  Max: 25.146ms
+  Std: 0.501ms
+  Count: 11
+
+Layer 14:
+  Avg: 23.759ms
+  Min: 23.290ms
+  Max: 25.111ms
+  Std: 0.496ms
+  Count: 11
+
+Layer 15:
+  Avg: 23.585ms
+  Min: 23.206ms
+  Max: 24.157ms
+  Std: 0.304ms
+  Count: 11
+
+Run 10 timing breakdown:
+
+Global Component Timing Statistics:
+
+LlamaForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 24.461ms
+  Min: 23.924ms
+  Max: 25.659ms
+  Std: 0.489ms
+  Count: 12
+
+Layer 1:
+  Avg: 23.704ms
+  Min: 23.209ms
+  Max: 24.638ms
+  Std: 0.405ms
+  Count: 12
+
+Layer 2:
+  Avg: 23.564ms
+  Min: 23.134ms
+  Max: 24.027ms
+  Std: 0.249ms
+  Count: 12
+
+Layer 3:
+  Avg: 23.455ms
+  Min: 23.049ms
+  Max: 23.974ms
+  Std: 0.244ms
+  Count: 12
+
+Layer 4:
+  Avg: 25.248ms
+  Min: 23.100ms
+  Max: 44.856ms
+  Std: 5.919ms
+  Count: 12
+
+Layer 5:
+  Avg: 25.763ms
+  Min: 23.067ms
+  Max: 48.847ms
+  Std: 6.972ms
+  Count: 12
+
+Layer 6:
+  Avg: 29.836ms
+  Min: 23.200ms
+  Max: 62.998ms
+  Std: 12.116ms
+  Count: 12
+
+Layer 7:
+  Avg: 26.908ms
+  Min: 23.458ms
+  Max: 49.048ms
+  Std: 7.562ms
+  Count: 12
+
+Layer 8:
+  Avg: 24.931ms
+  Min: 23.187ms
+  Max: 31.528ms
+  Std: 2.878ms
+  Count: 12
+
+Layer 9:
+  Avg: 25.301ms
+  Min: 23.211ms
+  Max: 41.684ms
+  Std: 4.980ms
+  Count: 12
+
+Layer 10:
+  Avg: 24.485ms
+  Min: 23.187ms
+  Max: 32.134ms
+  Std: 2.399ms
+  Count: 12
+
+Layer 11:
+  Avg: 25.060ms
+  Min: 23.409ms
+  Max: 40.474ms
+  Std: 4.662ms
+  Count: 12
+
+Layer 12:
+  Avg: 23.949ms
+  Min: 23.426ms
+  Max: 27.623ms
+  Std: 1.120ms
+  Count: 12
+
+Layer 13:
+  Avg: 23.735ms
+  Min: 23.271ms
+  Max: 25.146ms
+  Std: 0.499ms
+  Count: 12
+
+Layer 14:
+  Avg: 23.723ms
+  Min: 23.290ms
+  Max: 25.111ms
+  Std: 0.490ms
+  Count: 12
+
+Layer 15:
+  Avg: 23.592ms
+  Min: 23.206ms
+  Max: 24.157ms
+  Std: 0.291ms
+  Count: 12
+
+SkipLLaMA Benchmark:
+
+Run 1 timing breakdown:
+
+Global Component Timing Statistics:
+
+attention:
+  Avg: 6.772ms
+  Min: 3.793ms
+  Max: 26.562ms
+  Total: 108.358ms
+  Count: 16
+
+lora_proj:
+  Avg: 0.284ms
+  Min: 0.109ms
+  Max: 1.536ms
+  Total: 4.543ms
+  Count: 16
+
+mlp:
+  Avg: 50.585ms
+  Min: 16.645ms
+  Max: 73.796ms
+  Total: 809.363ms
+  Count: 16
+
+layernorm:
+  Avg: 0.186ms
+  Min: 0.003ms
+  Max: 0.369ms
+  Total: 2.969ms
+  Count: 16
+
+LlamaSkipConnectionForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 180.770ms
+  Min: 79.199ms
+  Max: 382.725ms
+  Std: 142.804ms
+  Count: 3
+
+Layer 1:
+  Avg: 29.391ms
+  Min: 20.561ms
+  Max: 37.248ms
+  Std: 6.847ms
+  Count: 3
+
+Layer 2:
+  Avg: 53.614ms
+  Min: 52.290ms
+  Max: 54.320ms
+  Std: 0.937ms
+  Count: 3
+
+Layer 3:
+  Avg: 32.732ms
+  Min: 30.305ms
+  Max: 34.585ms
+  Std: 1.794ms
+  Count: 3
+
+Layer 4:
+  Avg: 78.293ms
+  Min: 77.450ms
+  Max: 78.898ms
+  Std: 0.615ms
+  Count: 3
+
+Layer 5:
+  Avg: 50.300ms
+  Min: 48.156ms
+  Max: 53.329ms
+  Std: 2.203ms
+  Count: 3
+
+Layer 6:
+  Avg: 44.854ms
+  Min: 41.670ms
+  Max: 47.322ms
+  Std: 2.362ms
+  Count: 3
+
+Layer 7:
+  Avg: 74.912ms
+  Min: 72.087ms
+  Max: 76.491ms
+  Std: 2.002ms
+  Count: 3
+
+Layer 8:
+  Avg: 75.345ms
+  Min: 68.808ms
+  Max: 87.854ms
+  Std: 8.848ms
+  Count: 3
+
+Layer 9:
+  Avg: 44.537ms
+  Min: 39.646ms
+  Max: 47.555ms
+  Std: 3.490ms
+  Count: 3
+
+Layer 10:
+  Avg: 45.171ms
+  Min: 43.509ms
+  Max: 47.744ms
+  Std: 1.845ms
+  Count: 3
+
+Layer 11:
+  Avg: 42.554ms
+  Min: 38.185ms
+  Max: 45.880ms
+  Std: 3.227ms
+  Count: 3
+
+Layer 12:
+  Avg: 78.240ms
+  Min: 77.547ms
+  Max: 79.257ms
+  Std: 0.734ms
+  Count: 3
+
+Layer 13:
+  Avg: 67.530ms
+  Min: 63.549ms
+  Max: 74.352ms
+  Std: 4.846ms
+  Count: 3
+
+Layer 14:
+  Avg: 26.885ms
+  Min: 17.253ms
+  Max: 45.323ms
+  Std: 13.042ms
+  Count: 3
+
+Layer 15:
+  Avg: 55.270ms
+  Min: 40.984ms
+  Max: 82.966ms
+  Std: 19.587ms
+  Count: 3
+
+Run 2 timing breakdown:
+
+Global Component Timing Statistics:
+
+attention:
+  Avg: 32.347ms
+  Min: 3.760ms
+  Max: 52.949ms
+  Total: 517.559ms
+  Count: 16
+
+lora_proj:
+  Avg: 16.806ms
+  Min: 0.123ms
+  Max: 22.963ms
+  Total: 268.900ms
+  Count: 16
+
+mlp:
+  Avg: 36.143ms
+  Min: 14.960ms
+  Max: 71.409ms
+  Total: 578.292ms
+  Count: 16
+
+layernorm:
+  Avg: 0.177ms
+  Min: 0.131ms
+  Max: 0.206ms
+  Total: 2.834ms
+  Count: 16
+
+LlamaSkipConnectionForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 172.621ms
+  Min: 79.199ms
+  Max: 382.725ms
+  Std: 124.475ms
+  Count: 4
+
+Layer 1:
+  Avg: 30.459ms
+  Min: 20.561ms
+  Max: 37.248ms
+  Std: 6.212ms
+  Count: 4
+
+Layer 2:
+  Avg: 62.623ms
+  Min: 52.290ms
+  Max: 89.651ms
+  Std: 15.625ms
+  Count: 4
+
+Layer 3:
+  Avg: 38.618ms
+  Min: 30.305ms
+  Max: 56.277ms
+  Std: 10.313ms
+  Count: 4
+
+Layer 4:
+  Avg: 84.183ms
+  Min: 77.450ms
+  Max: 101.855ms
+  Std: 10.217ms
+  Count: 4
+
+Layer 5:
+  Avg: 56.884ms
+  Min: 48.156ms
+  Max: 76.639ms
+  Std: 11.564ms
+  Count: 4
+
+Layer 6:
+  Avg: 52.912ms
+  Min: 41.670ms
+  Max: 77.085ms
+  Std: 14.105ms
+  Count: 4
+
+Layer 7:
+  Avg: 81.262ms
+  Min: 72.087ms
+  Max: 100.311ms
+  Std: 11.134ms
+  Count: 4
+
+Layer 8:
+  Avg: 80.385ms
+  Min: 68.808ms
+  Max: 95.505ms
+  Std: 11.615ms
+  Count: 4
+
+Layer 9:
+  Avg: 53.638ms
+  Min: 39.646ms
+  Max: 80.940ms
+  Std: 16.050ms
+  Count: 4
+
+Layer 10:
+  Avg: 52.613ms
+  Min: 43.509ms
+  Max: 74.939ms
+  Std: 12.988ms
+  Count: 4
+
+Layer 11:
+  Avg: 55.855ms
+  Min: 38.185ms
+  Max: 95.758ms
+  Std: 23.207ms
+  Count: 4
+
+Layer 12:
+  Avg: 88.763ms
+  Min: 77.547ms
+  Max: 120.331ms
+  Std: 18.237ms
+  Count: 4
+
+Layer 13:
+  Avg: 66.463ms
+  Min: 63.260ms
+  Max: 74.352ms
+  Std: 4.586ms
+  Count: 4
+
+Layer 14:
+  Avg: 40.268ms
+  Min: 17.253ms
+  Max: 80.417ms
+  Std: 25.785ms
+  Count: 4
+
+Layer 15:
+  Avg: 62.481ms
+  Min: 40.984ms
+  Max: 84.112ms
+  Std: 21.064ms
+  Count: 4
+
+Run 3 timing breakdown:
+
+Global Component Timing Statistics:
+
+attention:
+  Avg: 33.274ms
+  Min: 3.836ms
+  Max: 100.420ms
+  Total: 532.384ms
+  Count: 16
+
+lora_proj:
+  Avg: 15.889ms
+  Min: 0.122ms
+  Max: 43.266ms
+  Total: 254.231ms
+  Count: 16
+
+mlp:
+  Avg: 43.993ms
+  Min: 6.331ms
+  Max: 73.255ms
+  Total: 703.884ms
+  Count: 16
+
+layernorm:
+  Avg: 0.182ms
+  Min: 0.150ms
+  Max: 0.219ms
+  Total: 2.916ms
+  Count: 16
+
+LlamaSkipConnectionForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 166.435ms
+  Min: 79.199ms
+  Max: 382.725ms
+  Std: 112.019ms
+  Count: 5
+
+Layer 1:
+  Avg: 55.444ms
+  Min: 20.561ms
+  Max: 155.387ms
+  Std: 50.279ms
+  Count: 5
+
+Layer 2:
+  Avg: 66.353ms
+  Min: 52.290ms
+  Max: 89.651ms
+  Std: 15.842ms
+  Count: 5
+
+Layer 3:
+  Avg: 48.282ms
+  Min: 30.305ms
+  Max: 86.935ms
+  Std: 21.415ms
+  Count: 5
+
+Layer 4:
+  Avg: 93.122ms
+  Min: 77.450ms
+  Max: 128.877ms
+  Std: 20.078ms
+  Count: 5
+
+Layer 5:
+  Avg: 62.229ms
+  Min: 48.156ms
+  Max: 83.609ms
+  Std: 14.874ms
+  Count: 5
+
+Layer 6:
+  Avg: 60.082ms
+  Min: 41.670ms
+  Max: 88.761ms
+  Std: 19.100ms
+  Count: 5
+
+Layer 7:
+  Avg: 91.224ms
+  Min: 72.087ms
+  Max: 131.072ms
+  Std: 22.274ms
+  Count: 5
+
+Layer 8:
+  Avg: 87.452ms
+  Min: 68.808ms
+  Max: 115.720ms
+  Std: 17.541ms
+  Count: 5
+
+Layer 9:
+  Avg: 61.395ms
+  Min: 39.646ms
+  Max: 92.423ms
+  Std: 21.137ms
+  Count: 5
+
+Layer 10:
+  Avg: 56.125ms
+  Min: 43.509ms
+  Max: 74.939ms
+  Std: 13.576ms
+  Count: 5
+
+Layer 11:
+  Avg: 55.637ms
+  Min: 38.185ms
+  Max: 95.758ms
+  Std: 20.762ms
+  Count: 5
+
+Layer 12:
+  Avg: 95.157ms
+  Min: 77.547ms
+  Max: 120.733ms
+  Std: 20.727ms
+  Count: 5
+
+Layer 13:
+  Avg: 67.360ms
+  Min: 63.260ms
+  Max: 74.352ms
+  Std: 4.477ms
+  Count: 5
+
+Layer 14:
+  Avg: 38.249ms
+  Min: 17.253ms
+  Max: 80.417ms
+  Std: 23.414ms
+  Count: 5
+
+Layer 15:
+  Avg: 60.645ms
+  Min: 40.984ms
+  Max: 84.112ms
+  Std: 19.195ms
+  Count: 5
+
+Run 4 timing breakdown:
+
+Global Component Timing Statistics:
+
+attention:
+  Avg: 37.110ms
+  Min: 4.205ms
+  Max: 88.713ms
+  Total: 593.760ms
+  Count: 16
+
+lora_proj:
+  Avg: 15.433ms
+  Min: 0.119ms
+  Max: 34.037ms
+  Total: 246.924ms
+  Count: 16
+
+mlp:
+  Avg: 37.146ms
+  Min: 11.912ms
+  Max: 82.835ms
+  Total: 594.342ms
+  Count: 16
+
+layernorm:
+  Avg: 0.175ms
+  Min: 0.133ms
+  Max: 0.193ms
+  Total: 2.802ms
+  Count: 16
+
+LlamaSkipConnectionForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 153.353ms
+  Min: 79.199ms
+  Max: 382.725ms
+  Std: 106.360ms
+  Count: 6
+
+Layer 1:
+  Avg: 58.774ms
+  Min: 20.561ms
+  Max: 155.387ms
+  Std: 46.498ms
+  Count: 6
+
+Layer 2:
+  Avg: 70.482ms
+  Min: 52.290ms
+  Max: 91.129ms
+  Std: 17.158ms
+  Count: 6
+
+Layer 3:
+  Avg: 54.138ms
+  Min: 30.305ms
+  Max: 86.935ms
+  Std: 23.530ms
+  Count: 6
+
+Layer 4:
+  Avg: 97.435ms
+  Min: 77.450ms
+  Max: 128.877ms
+  Std: 20.710ms
+  Count: 6
+
+Layer 5:
+  Avg: 65.401ms
+  Min: 48.156ms
+  Max: 83.609ms
+  Std: 15.319ms
+  Count: 6
+
+Layer 6:
+  Avg: 62.596ms
+  Min: 41.670ms
+  Max: 88.761ms
+  Std: 18.319ms
+  Count: 6
+
+Layer 7:
+  Avg: 94.837ms
+  Min: 72.087ms
+  Max: 131.072ms
+  Std: 21.880ms
+  Count: 6
+
+Layer 8:
+  Avg: 91.622ms
+  Min: 68.808ms
+  Max: 115.720ms
+  Std: 18.529ms
+  Count: 6
+
+Layer 9:
+  Avg: 63.700ms
+  Min: 39.646ms
+  Max: 92.423ms
+  Std: 19.972ms
+  Count: 6
+
+Layer 10:
+  Avg: 57.768ms
+  Min: 43.509ms
+  Max: 74.939ms
+  Std: 12.926ms
+  Count: 6
+
+Layer 11:
+  Avg: 55.676ms
+  Min: 38.185ms
+  Max: 95.758ms
+  Std: 18.953ms
+  Count: 6
+
+Layer 12:
+  Avg: 97.915ms
+  Min: 77.547ms
+  Max: 120.733ms
+  Std: 19.901ms
+  Count: 6
+
+Layer 13:
+  Avg: 71.827ms
+  Min: 63.260ms
+  Max: 94.163ms
+  Std: 10.793ms
+  Count: 6
+
+Layer 14:
+  Avg: 52.502ms
+  Min: 17.253ms
+  Max: 123.767ms
+  Std: 38.374ms
+  Count: 6
+
+Layer 15:
+  Avg: 64.720ms
+  Min: 40.984ms
+  Max: 85.096ms
+  Std: 19.750ms
+  Count: 6
+
+Run 5 timing breakdown:
+
+Global Component Timing Statistics:
+
+attention:
+  Avg: 30.283ms
+  Min: 3.906ms
+  Max: 80.947ms
+  Total: 484.528ms
+  Count: 16
+
+lora_proj:
+  Avg: 13.323ms
+  Min: 0.110ms
+  Max: 22.942ms
+  Total: 213.161ms
+  Count: 16
+
+mlp:
+  Avg: 38.893ms
+  Min: 0.950ms
+  Max: 72.148ms
+  Total: 622.284ms
+  Count: 16
+
+layernorm:
+  Avg: 0.176ms
+  Min: 0.002ms
+  Max: 0.444ms
+  Total: 2.818ms
+  Count: 16
+
+LlamaSkipConnectionForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 144.798ms
+  Min: 79.199ms
+  Max: 382.725ms
+  Std: 100.676ms
+  Count: 7
+
+Layer 1:
+  Avg: 65.435ms
+  Min: 20.561ms
+  Max: 155.387ms
+  Std: 46.037ms
+  Count: 7
+
+Layer 2:
+  Avg: 68.705ms
+  Min: 52.290ms
+  Max: 91.129ms
+  Std: 16.471ms
+  Count: 7
+
+Layer 3:
+  Avg: 58.097ms
+  Min: 30.305ms
+  Max: 86.935ms
+  Std: 23.845ms
+  Count: 7
+
+Layer 4:
+  Avg: 99.144ms
+  Min: 77.450ms
+  Max: 128.877ms
+  Std: 19.626ms
+  Count: 7
+
+Layer 5:
+  Avg: 69.223ms
+  Min: 48.156ms
+  Max: 92.156ms
+  Std: 16.994ms
+  Count: 7
+
+Layer 6:
+  Avg: 63.536ms
+  Min: 41.670ms
+  Max: 88.761ms
+  Std: 17.116ms
+  Count: 7
+
+Layer 7:
+  Avg: 97.587ms
+  Min: 72.087ms
+  Max: 131.072ms
+  Std: 21.347ms
+  Count: 7
+
+Layer 8:
+  Avg: 96.976ms
+  Min: 68.808ms
+  Max: 129.103ms
+  Std: 21.594ms
+  Count: 7
+
+Layer 9:
+  Avg: 65.925ms
+  Min: 39.646ms
+  Max: 92.423ms
+  Std: 19.277ms
+  Count: 7
+
+Layer 10:
+  Avg: 59.201ms
+  Min: 43.509ms
+  Max: 74.939ms
+  Std: 12.471ms
+  Count: 7
+
+Layer 11:
+  Avg: 58.957ms
+  Min: 38.185ms
+  Max: 95.758ms
+  Std: 19.300ms
+  Count: 7
+
+Layer 12:
+  Avg: 99.403ms
+  Min: 77.547ms
+  Max: 120.733ms
+  Std: 18.781ms
+  Count: 7
+
+Layer 13:
+  Avg: 74.492ms
+  Min: 63.260ms
+  Max: 94.163ms
+  Std: 11.936ms
+  Count: 7
+
+Layer 14:
+  Avg: 47.499ms
+  Min: 17.253ms
+  Max: 123.767ms
+  Std: 37.582ms
+  Count: 7
+
+Layer 15:
+  Avg: 61.584ms
+  Min: 40.984ms
+  Max: 85.096ms
+  Std: 19.833ms
+  Count: 7
+
+Run 6 timing breakdown:
+
+Global Component Timing Statistics:
+
+attention:
+  Avg: 5.255ms
+  Min: 3.719ms
+  Max: 19.893ms
+  Total: 84.080ms
+  Count: 16
+
+lora_proj:
+  Avg: 0.213ms
+  Min: 0.112ms
+  Max: 1.556ms
+  Total: 3.405ms
+  Count: 16
+
+mlp:
+  Avg: 45.204ms
+  Min: 13.300ms
+  Max: 71.705ms
+  Total: 723.269ms
+  Count: 16
+
+layernorm:
+  Avg: 0.181ms
+  Min: 0.119ms
+  Max: 0.203ms
+  Total: 2.888ms
+  Count: 16
+
+LlamaSkipConnectionForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 136.505ms
+  Min: 78.453ms
+  Max: 382.725ms
+  Std: 96.696ms
+  Count: 8
+
+Layer 1:
+  Avg: 59.787ms
+  Min: 20.249ms
+  Max: 155.387ms
+  Std: 45.583ms
+  Count: 8
+
+Layer 2:
+  Avg: 69.455ms
+  Min: 52.290ms
+  Max: 91.129ms
+  Std: 15.534ms
+  Count: 8
+
+Layer 3:
+  Avg: 55.102ms
+  Min: 30.305ms
+  Max: 86.935ms
+  Std: 23.671ms
+  Count: 8
+
+Layer 4:
+  Avg: 96.106ms
+  Min: 74.835ms
+  Max: 128.877ms
+  Std: 20.041ms
+  Count: 8
+
+Layer 5:
+  Avg: 67.318ms
+  Min: 48.156ms
+  Max: 92.156ms
+  Std: 16.677ms
+  Count: 8
+
+Layer 6:
+  Avg: 60.613ms
+  Min: 40.157ms
+  Max: 88.761ms
+  Std: 17.780ms
+  Count: 8
+
+Layer 7:
+  Avg: 94.762ms
+  Min: 72.087ms
+  Max: 131.072ms
+  Std: 21.320ms
+  Count: 8
+
+Layer 8:
+  Avg: 92.947ms
+  Min: 64.746ms
+  Max: 129.103ms
+  Std: 22.839ms
+  Count: 8
+
+Layer 9:
+  Avg: 62.763ms
+  Min: 39.646ms
+  Max: 92.423ms
+  Std: 19.878ms
+  Count: 8
+
+Layer 10:
+  Avg: 56.519ms
+  Min: 37.747ms
+  Max: 74.939ms
+  Std: 13.654ms
+  Count: 8
+
+Layer 11:
+  Avg: 56.109ms
+  Min: 36.171ms
+  Max: 95.758ms
+  Std: 19.563ms
+  Count: 8
+
+Layer 12:
+  Avg: 95.803ms
+  Min: 70.601ms
+  Max: 120.733ms
+  Std: 19.984ms
+  Count: 8
+
+Layer 13:
+  Avg: 73.079ms
+  Min: 63.185ms
+  Max: 94.163ms
+  Std: 11.775ms
+  Count: 8
+
+Layer 14:
+  Avg: 43.812ms
+  Min: 17.253ms
+  Max: 123.767ms
+  Std: 36.483ms
+  Count: 8
+
+Layer 15:
+  Avg: 59.054ms
+  Min: 40.984ms
+  Max: 85.096ms
+  Std: 19.723ms
+  Count: 8
+
+Run 7 timing breakdown:
+
+Global Component Timing Statistics:
+
+attention:
+  Avg: 4.270ms
+  Min: 3.410ms
+  Max: 8.315ms
+  Total: 68.317ms
+  Count: 16
+
+lora_proj:
+  Avg: 0.217ms
+  Min: 0.113ms
+  Max: 1.573ms
+  Total: 3.475ms
+  Count: 16
+
+mlp:
+  Avg: 47.073ms
+  Min: 12.244ms
+  Max: 73.472ms
+  Total: 753.170ms
+  Count: 16
+
+layernorm:
+  Avg: 0.180ms
+  Min: 0.133ms
+  Max: 0.209ms
+  Total: 2.884ms
+  Count: 16
+
+LlamaSkipConnectionForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 129.854ms
+  Min: 76.644ms
+  Max: 382.725ms
+  Std: 93.087ms
+  Count: 9
+
+Layer 1:
+  Avg: 55.578ms
+  Min: 20.249ms
+  Max: 155.387ms
+  Std: 44.595ms
+  Count: 9
+
+Layer 2:
+  Avg: 68.147ms
+  Min: 52.290ms
+  Max: 91.129ms
+  Std: 15.106ms
+  Count: 9
+
+Layer 3:
+  Avg: 52.990ms
+  Min: 30.305ms
+  Max: 86.935ms
+  Std: 23.102ms
+  Count: 9
+
+Layer 4:
+  Avg: 94.157ms
+  Min: 74.835ms
+  Max: 128.877ms
+  Std: 19.683ms
+  Count: 9
+
+Layer 5:
+  Avg: 66.022ms
+  Min: 48.156ms
+  Max: 92.156ms
+  Std: 16.144ms
+  Count: 9
+
+Layer 6:
+  Avg: 58.749ms
+  Min: 40.157ms
+  Max: 88.761ms
+  Std: 17.572ms
+  Count: 9
+
+Layer 7:
+  Avg: 93.044ms
+  Min: 72.087ms
+  Max: 131.072ms
+  Std: 20.680ms
+  Count: 9
+
+Layer 8:
+  Avg: 90.007ms
+  Min: 64.746ms
+  Max: 129.103ms
+  Std: 23.083ms
+  Count: 9
+
+Layer 9:
+  Avg: 60.235ms
+  Min: 39.646ms
+  Max: 92.423ms
+  Std: 20.059ms
+  Count: 9
+
+Layer 10:
+  Avg: 54.915ms
+  Min: 37.747ms
+  Max: 74.939ms
+  Std: 13.650ms
+  Count: 9
+
+Layer 11:
+  Avg: 54.210ms
+  Min: 36.171ms
+  Max: 95.758ms
+  Std: 19.210ms
+  Count: 9
+
+Layer 12:
+  Avg: 93.720ms
+  Min: 70.601ms
+  Max: 120.733ms
+  Std: 19.741ms
+  Count: 9
+
+Layer 13:
+  Avg: 71.958ms
+  Min: 62.993ms
+  Max: 94.163ms
+  Std: 11.545ms
+  Count: 9
+
+Layer 14:
+  Avg: 40.821ms
+  Min: 16.891ms
+  Max: 123.767ms
+  Std: 35.421ms
+  Count: 9
+
+Layer 15:
+  Avg: 57.342ms
+  Min: 40.984ms
+  Max: 85.096ms
+  Std: 19.215ms
+  Count: 9
+
+Run 8 timing breakdown:
+
+Global Component Timing Statistics:
+
+attention:
+  Avg: 3.921ms
+  Min: 3.222ms
+  Max: 4.744ms
+  Total: 62.738ms
+  Count: 16
+
+lora_proj:
+  Avg: 0.126ms
+  Min: 0.111ms
+  Max: 0.156ms
+  Total: 2.011ms
+  Count: 16
+
+mlp:
+  Avg: 45.864ms
+  Min: 11.190ms
+  Max: 71.979ms
+  Total: 733.830ms
+  Count: 16
+
+layernorm:
+  Avg: 0.189ms
+  Min: 0.145ms
+  Max: 0.236ms
+  Total: 3.029ms
+  Count: 16
+
+LlamaSkipConnectionForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 124.576ms
+  Min: 76.644ms
+  Max: 382.725ms
+  Std: 89.718ms
+  Count: 10
+
+Layer 1:
+  Avg: 52.246ms
+  Min: 20.249ms
+  Max: 155.387ms
+  Std: 43.471ms
+  Count: 10
+
+Layer 2:
+  Avg: 66.697ms
+  Min: 52.290ms
+  Max: 91.129ms
+  Std: 14.976ms
+  Count: 10
+
+Layer 3:
+  Avg: 50.658ms
+  Min: 29.670ms
+  Max: 86.935ms
+  Std: 23.006ms
+  Count: 10
+
+Layer 4:
+  Avg: 91.843ms
+  Min: 71.015ms
+  Max: 128.877ms
+  Std: 19.922ms
+  Count: 10
+
+Layer 5:
+  Avg: 65.009ms
+  Min: 48.156ms
+  Max: 92.156ms
+  Std: 15.615ms
+  Count: 10
+
+Layer 6:
+  Avg: 57.132ms
+  Min: 40.157ms
+  Max: 88.761ms
+  Std: 17.362ms
+  Count: 10
+
+Layer 7:
+  Avg: 91.059ms
+  Min: 72.087ms
+  Max: 131.072ms
+  Std: 20.503ms
+  Count: 10
+
+Layer 8:
+  Avg: 87.916ms
+  Min: 64.746ms
+  Max: 129.103ms
+  Std: 22.780ms
+  Count: 10
+
+Layer 9:
+  Avg: 58.326ms
+  Min: 39.646ms
+  Max: 92.423ms
+  Std: 19.873ms
+  Count: 10
+
+Layer 10:
+  Avg: 53.057ms
+  Min: 36.339ms
+  Max: 74.939ms
+  Std: 14.098ms
+  Count: 10
+
+Layer 11:
+  Avg: 52.748ms
+  Min: 36.171ms
+  Max: 95.758ms
+  Std: 18.745ms
+  Count: 10
+
+Layer 12:
+  Avg: 91.540ms
+  Min: 70.601ms
+  Max: 120.733ms
+  Std: 19.837ms
+  Count: 10
+
+Layer 13:
+  Avg: 71.593ms
+  Min: 62.993ms
+  Max: 94.163ms
+  Std: 11.007ms
+  Count: 10
+
+Layer 14:
+  Avg: 38.345ms
+  Min: 16.065ms
+  Max: 123.767ms
+  Std: 34.415ms
+  Count: 10
+
+Layer 15:
+  Avg: 55.970ms
+  Min: 40.984ms
+  Max: 85.096ms
+  Std: 18.688ms
+  Count: 10
+
+Run 9 timing breakdown:
+
+Global Component Timing Statistics:
+
+attention:
+  Avg: 4.171ms
+  Min: 3.261ms
+  Max: 5.138ms
+  Total: 66.731ms
+  Count: 16
+
+lora_proj:
+  Avg: 0.122ms
+  Min: 0.114ms
+  Max: 0.133ms
+  Total: 1.958ms
+  Count: 16
+
+mlp:
+  Avg: 47.173ms
+  Min: 9.002ms
+  Max: 74.202ms
+  Total: 754.765ms
+  Count: 16
+
+layernorm:
+  Avg: 0.180ms
+  Min: 0.125ms
+  Max: 0.207ms
+  Total: 2.881ms
+  Count: 16
+
+LlamaSkipConnectionForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 120.322ms
+  Min: 76.644ms
+  Max: 382.725ms
+  Std: 86.594ms
+  Count: 11
+
+Layer 1:
+  Avg: 48.738ms
+  Min: 13.650ms
+  Max: 155.387ms
+  Std: 42.908ms
+  Count: 11
+
+Layer 2:
+  Avg: 65.334ms
+  Min: 51.699ms
+  Max: 91.129ms
+  Std: 14.916ms
+  Count: 11
+
+Layer 3:
+  Avg: 48.758ms
+  Min: 29.670ms
+  Max: 86.935ms
+  Std: 22.744ms
+  Count: 11
+
+Layer 4:
+  Avg: 90.679ms
+  Min: 71.015ms
+  Max: 128.877ms
+  Std: 19.348ms
+  Count: 11
+
+Layer 5:
+  Avg: 63.967ms
+  Min: 48.156ms
+  Max: 92.156ms
+  Std: 15.248ms
+  Count: 11
+
+Layer 6:
+  Avg: 55.703ms
+  Min: 40.157ms
+  Max: 88.761ms
+  Std: 17.160ms
+  Count: 11
+
+Layer 7:
+  Avg: 89.481ms
+  Min: 72.087ms
+  Max: 131.072ms
+  Std: 20.176ms
+  Count: 11
+
+Layer 8:
+  Avg: 86.097ms
+  Min: 64.746ms
+  Max: 129.103ms
+  Std: 22.469ms
+  Count: 11
+
+Layer 9:
+  Avg: 57.089ms
+  Min: 39.646ms
+  Max: 92.423ms
+  Std: 19.347ms
+  Count: 11
+
+Layer 10:
+  Avg: 52.353ms
+  Min: 36.339ms
+  Max: 74.939ms
+  Std: 13.624ms
+  Count: 11
+
+Layer 11:
+  Avg: 51.976ms
+  Min: 36.171ms
+  Max: 95.758ms
+  Std: 18.038ms
+  Count: 11
+
+Layer 12:
+  Avg: 90.186ms
+  Min: 70.601ms
+  Max: 120.733ms
+  Std: 19.392ms
+  Count: 11
+
+Layer 13:
+  Avg: 71.142ms
+  Min: 62.993ms
+  Max: 94.163ms
+  Std: 10.591ms
+  Count: 11
+
+Layer 14:
+  Avg: 37.637ms
+  Min: 16.065ms
+  Max: 123.767ms
+  Std: 32.889ms
+  Count: 11
+
+Layer 15:
+  Avg: 54.489ms
+  Min: 39.687ms
+  Max: 85.096ms
+  Std: 18.423ms
+  Count: 11
+
+Run 10 timing breakdown:
+
+Global Component Timing Statistics:
+
+attention:
+  Avg: 4.743ms
+  Min: 3.417ms
+  Max: 8.919ms
+  Total: 75.886ms
+  Count: 16
+
+lora_proj:
+  Avg: 1.756ms
+  Min: 0.111ms
+  Max: 23.095ms
+  Total: 28.090ms
+  Count: 16
+
+mlp:
+  Avg: 48.087ms
+  Min: 13.396ms
+  Max: 74.021ms
+  Total: 769.384ms
+  Count: 16
+
+layernorm:
+  Avg: 0.180ms
+  Min: 0.127ms
+  Max: 0.215ms
+  Total: 2.887ms
+  Count: 16
+
+LlamaSkipConnectionForCausalLM Layer-wise Statistics:
+
+Layer 0:
+  Avg: 117.022ms
+  Min: 76.644ms
+  Max: 382.725ms
+  Std: 83.627ms
+  Count: 12
+
+Layer 1:
+  Avg: 46.667ms
+  Min: 13.650ms
+  Max: 155.387ms
+  Std: 41.651ms
+  Count: 12
+
+Layer 2:
+  Avg: 64.427ms
+  Min: 51.699ms
+  Max: 91.129ms
+  Std: 14.594ms
+  Count: 12
+
+Layer 3:
+  Avg: 47.910ms
+  Min: 29.670ms
+  Max: 86.935ms
+  Std: 21.956ms
+  Count: 12
+
+Layer 4:
+  Avg: 89.691ms
+  Min: 71.015ms
+  Max: 128.877ms
+  Std: 18.811ms
+  Count: 12
+
+Layer 5:
+  Avg: 64.018ms
+  Min: 48.156ms
+  Max: 92.156ms
+  Std: 14.600ms
+  Count: 12
+
+Layer 6:
+  Avg: 57.619ms
+  Min: 40.157ms
+  Max: 88.761ms
+  Std: 17.615ms
+  Count: 12
+
+Layer 7:
+  Avg: 88.316ms
+  Min: 72.087ms
+  Max: 131.072ms
+  Std: 19.700ms
+  Count: 12
+
+Layer 8:
+  Avg: 84.458ms
+  Min: 64.746ms
+  Max: 129.103ms
+  Std: 22.188ms
+  Count: 12
+
+Layer 9:
+  Avg: 55.798ms
+  Min: 39.646ms
+  Max: 92.423ms
+  Std: 19.012ms
+  Count: 12
+
+Layer 10:
+  Avg: 51.671ms
+  Min: 36.339ms
+  Max: 74.939ms
+  Std: 13.239ms
+  Count: 12
+
+Layer 11:
+  Avg: 50.601ms
+  Min: 35.478ms
+  Max: 95.758ms
+  Std: 17.862ms
+  Count: 12
+
+Layer 12:
+  Avg: 88.764ms
+  Min: 70.601ms
+  Max: 120.733ms
+  Std: 19.156ms
+  Count: 12
+
+Layer 13:
+  Avg: 70.736ms
+  Min: 62.993ms
+  Max: 94.163ms
+  Std: 10.229ms
+  Count: 12
+
+Layer 14:
+  Avg: 36.021ms
+  Min: 16.065ms
+  Max: 123.767ms
+  Std: 31.942ms
+  Count: 12
+
+Layer 15:
+  Avg: 53.767ms
+  Min: 39.687ms
+  Max: 85.096ms
+  Std: 17.801ms
+  Count: 12
+
+Comparative Results:
+Standard LLaMA vs SkipLLaMA Layer-wise Comparison:
+
+Layer 0:
+  Standard: 0.024ms
+  Skip: 0.117ms
+  Speedup: 0.21x
+
+Layer 1:
+  Standard: 0.024ms
+  Skip: 0.047ms
+  Speedup: 0.51x
+
+Layer 2:
+  Standard: 0.024ms
+  Skip: 0.064ms
+  Speedup: 0.37x
+
+Layer 3:
+  Standard: 0.023ms
+  Skip: 0.048ms
+  Speedup: 0.49x
+
+Layer 4:
+  Standard: 0.025ms
+  Skip: 0.090ms
+  Speedup: 0.28x
+
+Layer 5:
+  Standard: 0.026ms
+  Skip: 0.064ms
+  Speedup: 0.40x
+
+Layer 6:
+  Standard: 0.030ms
+  Skip: 0.058ms
+  Speedup: 0.52x
+
+Layer 7:
+  Standard: 0.027ms
+  Skip: 0.088ms
+  Speedup: 0.30x
+
+Layer 8:
+  Standard: 0.025ms
+  Skip: 0.084ms
+  Speedup: 0.30x
+
+Layer 9:
+  Standard: 0.025ms
+  Skip: 0.056ms
+  Speedup: 0.45x
+
+Layer 10:
+  Standard: 0.024ms
+  Skip: 0.052ms
+  Speedup: 0.47x
+
+Layer 11:
+  Standard: 0.025ms
+  Skip: 0.051ms
+  Speedup: 0.50x
+
+Layer 12:
+  Standard: 0.024ms
+  Skip: 0.089ms
+  Speedup: 0.27x
+
+Layer 13:
+  Standard: 0.024ms
+  Skip: 0.071ms
+  Speedup: 0.34x
+
+Layer 14:
+  Standard: 0.024ms
+  Skip: 0.036ms
+  Speedup: 0.66x
+
+Layer 15:
+  Standard: 0.024ms
+  Skip: 0.054ms
+  Speedup: 0.44x
+
+Standard LLaMA:
+Average time: 0.448s
+Min time: 0.427s
+Max time: 0.518s
+
+SkipLLaMA:
+Average time: 1.387s
+Min time: 0.992s
+Max time: 2.052s
+
+Speedup: 0.32x
