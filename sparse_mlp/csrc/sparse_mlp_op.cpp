@@ -22,86 +22,12 @@ namespace py = pybind11;
 // Add timing utilities
 #include <chrono>
 
+// Add device check utilities
+#include <c10/cuda/CUDAGuard.h>
+
 // Add weight cache class with layer and batch support TODO Make it Model instance dependent
-class WeightCache : public torch::CustomClassHolder {
-private:
-    bool is_initialized = false;
-    torch::Tensor active_weights; // Combined weights
-    torch::Tensor active_downs;
-    
-    // Delete copy/move operations
-    WeightCache(const WeightCache&) = delete;
-    WeightCache& operator=(const WeightCache&) = delete;
-    WeightCache(WeightCache&&) = delete;
-    WeightCache& operator=(WeightCache&&) = delete;
-    
-protected:
-    WeightCache() = default;
-    friend c10::intrusive_ptr<WeightCache>;
+#include "weight_cache.h"
 
-public:
-    static c10::intrusive_ptr<WeightCache> getInstance() {
-        static c10::intrusive_ptr<WeightCache> instance = c10::make_intrusive<WeightCache>();
-        return instance;
-    }
-    
-    void clear() {
-        active_weights = torch::Tensor();
-        active_downs = torch::Tensor();
-        is_initialized = false;
-    }
-    
-    void init(int64_t batch_size) {
-        clear();
-        active_weights = torch::empty({2048, 3276}); // Combined size for gate+up
-        active_downs = torch::empty({1638, 2048});
-        is_initialized = true;
-    }
-    
-    void store(const torch::Tensor& concat_weights, const torch::Tensor& down) {
-        active_weights = concat_weights;
-        active_downs = down;
-    }
-    
-    std::tuple<torch::Tensor, torch::Tensor> get() {
-        return std::make_tuple(active_weights, active_downs);
-    }
-};
-
-// Background task manager with proper synchronization
-class BackgroundTaskManager : public torch::CustomClassHolder {
-private:
-    std::mutex mtx;
-    std::future<void> current_task;
-    bool task_running = false;
-    
-    BackgroundTaskManager() = default;
-    friend c10::intrusive_ptr<BackgroundTaskManager>;
-
-public:
-    static c10::intrusive_ptr<BackgroundTaskManager> getInstance() {
-        static c10::intrusive_ptr<BackgroundTaskManager> instance = 
-            c10::make_intrusive<BackgroundTaskManager>();
-        return instance;
-    }
-    
-    void start_task(std::function<void()> task) {
-        std::lock_guard<std::mutex> lock(mtx);
-        if (task_running && current_task.valid()) {
-            current_task.wait();
-        }
-        current_task = std::async(std::launch::async, task);
-        task_running = true;
-    }
-    
-    void wait() {
-        std::lock_guard<std::mutex> lock(mtx);
-        if (task_running && current_task.valid()) {
-            current_task.wait();
-            task_running = false;
-        }
-    }
-};
 class Timer {
 private:
     std::chrono::high_resolution_clock::time_point start_time;
@@ -135,27 +61,67 @@ void compute_active_weights(
     WeightCache::getInstance()->store(concat_weights, active_down);
 }
 
+// Forward declarations of CPU/CUDA implementations
+torch::Tensor sparse_mlp_forward_cpu(
+    const torch::Tensor& input,
+    torch::Tensor& down_proj_buffer,
+    torch::Tensor& combined_proj_buffer,
+    const std::string& activation_fn);
+
+#ifdef WITH_CUDA
+torch::Tensor sparse_mlp_forward_cuda(
+    const torch::Tensor& input,
+    torch::Tensor& down_proj_buffer,
+    torch::Tensor& combined_proj_buffer,
+    const std::string& activation_fn);
+#endif
+
+// Main dispatch function
 torch::Tensor sparse_mlp_forward(
-    torch::Tensor x, 
-    torch::Tensor down_proj_buffer,
-    torch::Tensor combined_proj_buffer,
-    std::string act_fn_name) {
+    const torch::Tensor& input,
+    torch::Tensor& down_proj_buffer,
+    torch::Tensor& combined_proj_buffer,
+    const std::string& activation_fn) {
     
-    int64_t batch_size = x.size(0);
-    int64_t hidden_size = x.size(1);
+    // Check if input is on CUDA and dispatch accordingly
+    if (input.is_cuda()) {
+        #ifdef WITH_CUDA
+            return sparse_mlp_forward_cuda(input, down_proj_buffer, combined_proj_buffer, activation_fn);
+        #else
+            AT_ERROR("CUDA not available - cannot run on GPU");
+        #endif
+    } else {
+        return sparse_mlp_forward_cpu(input, down_proj_buffer, combined_proj_buffer, activation_fn);
+    }
+}
+
+// CPU implementation
+torch::Tensor sparse_mlp_forward_cpu(
+    const torch::Tensor& input,
+    torch::Tensor& down_proj_buffer,
+    torch::Tensor& combined_proj_buffer,
+    const std::string& activation_fn) {
     
+    const auto batch_size = input.size(0);
+    const auto hidden_size = input.size(1);
+    
+    // Ensure output buffer is correctly sized
+    if (down_proj_buffer.size(0) != batch_size) {
+        down_proj_buffer.resize_({batch_size, hidden_size});
+    }
+    
+    // Process each batch item in parallel
     at::parallel_for(0, batch_size, 1, [&](int64_t start, int64_t end) {
         for (int64_t batch_idx = start; batch_idx < end; batch_idx++) {
             auto [concat_weight, active_down_weight] = WeightCache::getInstance()->get();
             int64_t gate_size = concat_weight.size(0) / 2;
-            
-            auto x_batch = x[batch_idx].unsqueeze(0).detach();
+            auto x_batch = input[batch_idx].unsqueeze(0).detach();
             
             // Single matmul for both gate and up projections
             auto proj_view = combined_proj_buffer[batch_idx].unsqueeze(0).narrow(1, 0, concat_weight.size(0));
             torch::matmul_out(proj_view, x_batch, concat_weight.t());
             
-            // Split result into gate and up projections using computed size
+            // Split result into gate and up projections
             auto gate_proj = proj_view.narrow(1, 0, gate_size);
             auto up_proj = proj_view.narrow(1, gate_size, gate_size);
             

@@ -3,6 +3,7 @@
 #include <cuda_runtime.h>
 #include <cuda_fp16.h>
 #include <vector>
+#include "weight_cache.h"
 
 // Helper function for half precision atomic add
 __device__ __forceinline__ void atomicAdd_half(__half* address, __half val) {
@@ -28,145 +29,85 @@ __device__ __forceinline__ void atomicAdd_half(__half* address, __half val) {
 template <typename scalar_t>
 __global__ void sparse_mlp_forward_cuda_kernel(
     const scalar_t* __restrict__ input,
-    const scalar_t* __restrict__ gate_weight,
-    const scalar_t* __restrict__ up_weight,
-    const scalar_t* __restrict__ down_weight,
-    const bool* __restrict__ mask,
+    const scalar_t* __restrict__ concat_weight,
+    const scalar_t* __restrict__ active_down_weight,
     scalar_t* __restrict__ output,
+    scalar_t* __restrict__ combined_buffer,
     const int batch_size,
     const int hidden_size,
-    const int intermediate_size,
-    const bool use_silu) {
+    const int intermediate_size) {
     
-    // Calculate indices for parallel processing
     const int batch_idx = blockIdx.x;
-    const int thread_idx = threadIdx.x;
-    const int num_threads = blockDim.x;
+    const int tid = threadIdx.x;
     
     if (batch_idx >= batch_size) return;
     
-    // Get input offset for this batch
+    // Get input and output pointers for this batch
     const scalar_t* batch_input = input + batch_idx * hidden_size;
-    const bool* batch_mask = mask + batch_idx * intermediate_size;
     scalar_t* batch_output = output + batch_idx * hidden_size;
+    scalar_t* batch_combined = combined_buffer + batch_idx * intermediate_size * 2;
     
-    // Shared memory for partial sums
-    extern __shared__ char shared_mem[];
-    scalar_t* shared_output = (scalar_t*)shared_mem;
-    
-    // Initialize shared memory
-    for (int i = thread_idx; i < hidden_size; i += num_threads) {
-        shared_output[i] = scalar_t(0.0f);
+    // Compute gate and up projections
+    for (int i = tid; i < intermediate_size * 2; i += blockDim.x) {
+        scalar_t sum = 0;
+        for (int j = 0; j < hidden_size; j++) {
+            sum += batch_input[j] * concat_weight[i * hidden_size + j];
+        }
+        batch_combined[i] = sum;
     }
     __syncthreads();
     
-    // Each thread processes a subset of intermediate positions
-    for (int j = thread_idx; j < intermediate_size; j += num_threads) {
-        if (!batch_mask[j]) continue;
-        
-        // Compute gate and up projections
-        scalar_t gate_val = scalar_t(0.0f);
-        scalar_t up_val = scalar_t(0.0f);
-        
-        #pragma unroll
-        for (int k = 0; k < hidden_size; k++) {
-            gate_val += batch_input[k] * gate_weight[j * hidden_size + k];
-            up_val += batch_input[k] * up_weight[j * hidden_size + k];
+    // Apply activations and compute final output
+    for (int i = tid; i < hidden_size; i += blockDim.x) {
+        scalar_t sum = 0;
+        for (int j = 0; j < intermediate_size; j++) {
+            const scalar_t gate = 1.0f / (1.0f + exp(-batch_combined[j]));
+            const scalar_t up = batch_combined[j + intermediate_size];
+            sum += gate * up * active_down_weight[i * intermediate_size + j];
         }
-        
-        // Apply activation
-        scalar_t activated;
-        if (use_silu) {
-            if constexpr (std::is_same_v<scalar_t, half>) {
-                float gate_float = __half2float(gate_val);
-                float up_float = __half2float(up_val);
-                float result = up_float * gate_float / (1.0f + expf(-gate_float));
-                activated = __float2half(result);
-            } else {
-                activated = up_val * gate_val / (1.0f + expf(-gate_val));
-            }
-        } else {
-            if constexpr (std::is_same_v<scalar_t, half>) {
-                float x = __half2float(gate_val);
-                float up_float = __half2float(up_val);
-                float result = 0.5f * x * (1.0f + tanhf(0.7978845608028654f * 
-                    (x + 0.044715f * x * x * x))) * up_float;
-                activated = __float2half(result);
-            } else {
-                const scalar_t x = gate_val;
-                activated = 0.5f * x * (1.0f + tanhf(0.7978845608028654f * 
-                    (x + 0.044715f * x * x * x))) * up_val;
-            }
-        }
-        
-        // Down projection - atomic add to shared memory
-        #pragma unroll
-        for (int k = 0; k < hidden_size; k++) {
-            if constexpr (std::is_same_v<scalar_t, at::Half>) {
-                atomicAdd_half(reinterpret_cast<__half*>(&shared_output[k]), 
-                    __hmul(activated, down_weight[k * intermediate_size + j]));
-            } else {
-                atomicAdd(&shared_output[k], 
-                    activated * down_weight[k * intermediate_size + j]);
-            }
-        }
-    }
-    
-    // Wait for all threads to complete
-    __syncthreads();
-    
-    // Write final results to global memory
-    for (int i = thread_idx; i < hidden_size; i += num_threads) {
-        batch_output[i] = shared_output[i];
+        batch_output[i] = sum;
     }
 }
 
-// CUDA forward implementation
 torch::Tensor sparse_mlp_forward_cuda(
     const torch::Tensor& input,
-    const torch::Tensor& gate_weight,
-    const torch::Tensor& up_weight,
-    const torch::Tensor& down_weight,
-    const torch::Tensor& mask,
+    torch::Tensor& down_proj_buffer,
+    torch::Tensor& combined_proj_buffer,
     const std::string& activation_fn) {
+    
+    auto cache = WeightCache::getInstance();
+    auto [concat_weight, active_down_weight] = cache->get();
     
     const auto batch_size = input.size(0);
     const auto hidden_size = input.size(1);
-    const auto intermediate_size = gate_weight.size(0);
+    const auto intermediate_size = concat_weight.size(0) / 2;
     
-    auto output = torch::zeros({batch_size, hidden_size}, input.options());
+    // Ensure buffers are on CUDA and correctly sized
+    down_proj_buffer = down_proj_buffer.to(input.device());
+    combined_proj_buffer = combined_proj_buffer.to(input.device());
     
-    // Launch parameters optimized for modern GPUs
-    const int threads_per_block = 256;  // Standard warp size * 8
-    const int shared_mem_size = hidden_size * sizeof(float);
+    if (down_proj_buffer.size(0) != batch_size) {
+        down_proj_buffer.resize_({batch_size, hidden_size});
+    }
+    if (combined_proj_buffer.size(0) != batch_size) {
+        combined_proj_buffer.resize_({batch_size, concat_weight.size(0)});
+    }
     
-    // Ensure we're not exceeding device limits
-    cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, 0);
-    TORCH_CHECK(shared_mem_size <= prop.sharedMemPerBlock,
-               "Required shared memory exceeds device limits");
+    const int threads = 256;
+    const int blocks = batch_size;
     
-    // Launch kernel with support for both float and half
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "sparse_mlp_forward_cuda", ([&] {
-        sparse_mlp_forward_cuda_kernel<scalar_t><<<batch_size, threads_per_block, shared_mem_size>>>(
+        sparse_mlp_forward_cuda_kernel<scalar_t><<<blocks, threads>>>(
             input.data_ptr<scalar_t>(),
-            gate_weight.data_ptr<scalar_t>(),
-            up_weight.data_ptr<scalar_t>(),
-            down_weight.data_ptr<scalar_t>(),
-            mask.data_ptr<bool>(),
-            output.data_ptr<scalar_t>(),
+            concat_weight.data_ptr<scalar_t>(),
+            active_down_weight.data_ptr<scalar_t>(),
+            down_proj_buffer.data_ptr<scalar_t>(),
+            combined_proj_buffer.data_ptr<scalar_t>(),
             batch_size,
             hidden_size,
-            intermediate_size,
-            activation_fn == "silu"
+            intermediate_size
         );
     }));
     
-    // Check for CUDA errors
-    cudaError_t error = cudaGetLastError();
-    TORCH_CHECK(error == cudaSuccess, 
-               "CUDA kernel execution failed: ", 
-               cudaGetErrorString(error));
-    
-    return output;
+    return down_proj_buffer;
 }
