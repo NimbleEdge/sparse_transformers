@@ -66,7 +66,6 @@ class FastLoRAProjection(nn.Module):
             self.output.resize_(batch_size, self.intermediate_size)
             self.output = self.output.to(dtype=dtype)
    
-    @torch.jit.script_method
     def forward(self, x, mask):
         batch_size = x.size(0)
         self._resize_buffers(batch_size, x.dtype)
@@ -85,7 +84,13 @@ class LlamaSkipMLP(nn.Module):
         self.register_buffer('down_proj_buffer', torch.zeros(14, hidden_size, requires_grad=False))
         self.register_buffer('combined_proj_buffer', torch.zeros(14, 2 * 1638, requires_grad=False))  # max_gate_size = 1638
 
-    @torch.jit.script_method
+    def to(self, *args, **kwargs):
+        # Move buffers to same device as model when .to() is called
+        device = args[0] if args else kwargs.get('device')
+        if device:
+            self.down_proj_buffer = self.down_proj_buffer.to(device)
+            self.combined_proj_buffer = self.combined_proj_buffer.to(device)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return sparse_mlp_forward(
             x.detach(), 
@@ -139,13 +144,12 @@ class LlamaSkipDecoderLayer(LlamaDecoderLayer):
         **kwargs: Unpack[FlashAttentionKwargs],
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         residual = hidden_states
-
         hidden_states = self.input_layernorm(hidden_states)
         # Reshape hidden states for batch processing
         hidden_states_reshaped = hidden_states.view(-1, hidden_states.shape[-1])
         
         # LoRA projection
-        lora_proj_mask = self.mlp_lora_proj(hidden_states_reshaped, self.mlp_mask)      
+        lora_proj_mask = self.mlp_lora_proj(hidden_states_reshaped, self.mlp_mask)    
 
         # Compute weights
         compute_active_weights(
@@ -154,7 +158,7 @@ class LlamaSkipDecoderLayer(LlamaDecoderLayer):
             self.mlp.down_proj.weight.detach(),
             lora_proj_mask
         )
-        
+
         # Self Attention
         hidden_states, self_attn_weights = self.self_attn(
             hidden_states=hidden_states,
@@ -176,7 +180,6 @@ class LlamaSkipDecoderLayer(LlamaDecoderLayer):
         hidden_states = self.mlp(hidden_states.view(-1, hidden_states.shape[-1]))
         hidden_states = hidden_states.view(residual.shape)
         hidden_states = residual + hidden_states
-
         outputs = (hidden_states,)
         if output_attentions:
             outputs += (self_attn_weights,)
@@ -312,6 +315,7 @@ class LlamaSkipConnectionModel(LlamaSkipPreTrainedModel):
                     position_embeddings,
                 )
             else:
+
                 layer_outputs = decoder_layer(
                     hidden_states,
                     attention_mask=causal_mask,
@@ -334,6 +338,7 @@ class LlamaSkipConnectionModel(LlamaSkipPreTrainedModel):
         # add hidden states from the last decoder layer
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
+        
 
         output = BaseModelOutputWithPast(
             last_hidden_state=hidden_states,

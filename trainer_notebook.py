@@ -1,6 +1,7 @@
 # %%
 import argparse
 import torch
+from contextlib import nullcontext
 
 from transformers import pipeline, AutoModelForCausalLM, AutoConfig, AutoTokenizer
 from transformers.models.llama.modeling_llama import LlamaMLP
@@ -55,22 +56,19 @@ scripted_model = LlamaSkipConnectionForCausalLM.from_pretrained(
     checkpoint, 
     config=config
 ).to(device)
+
 scripted_model.eval()
-
-# Move all masks to the correct device
-for module in scripted_model.modules():
-    if hasattr(module, 'mask'):
-        module.mask = module.mask.to(device)
-
-for module in scripted_model.modules():
-    if isinstance(module, LlamaSkipMLP) or isinstance(module, FastLoRAProjection):
-        module.eval()  # Ensure in eval mode before scripting
-        try:
-            scripted_module = torch.jit.script(module)
-            module.forward = scripted_module.forward
-        except Exception as e:
-            print(f"Failed to script module {type(module).__name__}: {str(e)}")
-            continue
+if args.device == 'cpu':
+    for module in scripted_model.modules():
+        if isinstance(module, LlamaSkipMLP) or isinstance(module, FastLoRAProjection):
+            module.eval()  # Ensure in eval mode before scripting
+            try:
+                # module.forward = torch.jit.scriptmethod(module.forward)
+                scripted_module = torch.jit.script(module)
+                module.forward = scripted_module.forward
+            except Exception as e:
+                print(f"Failed to script module {type(module).__name__}: {str(e)}")
+                continue
 
 # Generate text
 sequence = "Give recipe of burrito including all the ingredients and their quantity."
@@ -83,13 +81,8 @@ inputs = tokenizer(
 )
 
 # Explicitly move all input tensors to the same device as model
-input_ids = inputs["input_ids"].to(device)
-attention_mask = inputs["attention_mask"].to(device)
-
-# Debug prints
-print(f"Model device: {next(scripted_model.parameters()).device}")
-print(f"Input IDs device: {input_ids.device}")
-print(f"Attention Mask device: {attention_mask.device}")
+input_ids = inputs["input_ids"]
+attention_mask = inputs["attention_mask"]
 
 def create_pipeline(model, **kwargs):
     return pipeline(
@@ -130,11 +123,25 @@ def run_inference(model, input_ids, attention_mask, tokenizer, num_runs=args.num
                 return result
             
             module.register_forward_hook(forward_hook)
+    # Pre-compile model if using CUDA
+    if device.type == 'cuda':
+        # Warmup runs with fixed input to trigger CUDA graph capture
+        for _ in range(3):
+            with torch.amp.autocast(device_type='cuda'):  # Specify device type
+                with torch.no_grad():
+                    _ = model(
+                        base_input_ids,
+                        attention_mask=base_attention_mask,
+                        return_dict=False
+                    )
+        torch.cuda.synchronize()
+        
+    # Clear cache before main runs
+    if device.type == 'cuda':
+        torch.cuda.empty_cache()
+    gc.collect()
 
     for i in range(num_runs):
-        torch.cuda.empty_cache()
-        gc.collect()
-        
         # Randomize input for each run
         random_shift = torch.randint(-100, 100, base_input_ids.shape, device=device)
         input_ids = torch.clamp(base_input_ids + random_shift, min=0, max=tokenizer.vocab_size-1)
@@ -145,29 +152,42 @@ def run_inference(model, input_ids, attention_mask, tokenizer, num_runs=args.num
             model.past_key_values = None
         model._past_length = 0
         model.config.use_cache = False
+
+        # Ensure CUDA is ready
+        if device.type == 'cuda':
+            torch.cuda.synchronize()
         
-        # Warmup iteration
-        if i == 0:
-            with torch.no_grad():
+        start = time.perf_counter()
+        
+        with torch.no_grad():
+            # Use autocast only for CUDA
+            if device.type == 'cuda':
+                with torch.amp.autocast(device_type='cuda'):
+                    _ = model(
+                        input_ids,
+                        attention_mask=attention_mask,
+                        return_dict=False
+                    )
+            else:
                 _ = model(
                     input_ids,
                     attention_mask=attention_mask,
                     return_dict=False
                 )
-            continue
         
-        start = time.perf_counter()
-        
-        with torch.no_grad():
-            _ = model(
-                input_ids,
-                attention_mask=attention_mask,
-                return_dict=False
-            )
+        # Ensure kernel completion before timing
+        if device.type == 'cuda':
+            torch.cuda.synchronize()
             
         end = time.perf_counter()
-        times.append(end - start)    
-    
+        times.append(end - start)
+        
+        # Clear cache periodically
+        if i % 10 == 0:
+            if device.type == 'cuda':
+                torch.cuda.empty_cache()
+            gc.collect()
+
     return times, mlp_times
 
 print(f"\nRunning {args.device.upper()} inference benchmarks...")
@@ -190,8 +210,8 @@ print_results = lambda name, times: (
     print(f"Individual times: {[f'{t:.3f}s' for t in times]}")
 )
 
-print_results("SkipLLaMA Scripted MLP", skip_scripted_mlp_times)
-print_results("Standard LLaMA MLP", std_mlp_times)
+# print_results("SkipLLaMA Scripted MLP", skip_scripted_mlp_times)
+# print_results("Standard LLaMA MLP", std_mlp_times)
 
 calc_speedup = lambda t1, t2: (sum(t1)/len(t1))/(sum(t2)/len(t2))
 

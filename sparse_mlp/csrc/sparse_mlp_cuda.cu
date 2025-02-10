@@ -41,7 +41,7 @@ __global__ void sparse_mlp_forward_cuda_kernel(
     const int tid = threadIdx.x;
     
     if (batch_idx >= batch_size) return;
-    
+
     // Get input and output pointers for this batch
     const scalar_t* batch_input = input + batch_idx * hidden_size;
     scalar_t* batch_output = output + batch_idx * hidden_size;
@@ -75,6 +75,9 @@ torch::Tensor sparse_mlp_forward_cuda(
     torch::Tensor& combined_proj_buffer,
     const std::string& activation_fn) {
     
+    // Pre-allocate and pin memory
+    cudaStreamSynchronize(0);  // Ensure previous work is complete
+    
     auto cache = WeightCache::getInstance();
     auto [concat_weight, active_down_weight] = cache->get();
     
@@ -82,25 +85,34 @@ torch::Tensor sparse_mlp_forward_cuda(
     const auto hidden_size = input.size(1);
     const auto intermediate_size = concat_weight.size(0) / 2;
     
-    // Ensure buffers are on CUDA and correctly sized
-    down_proj_buffer = down_proj_buffer.to(input.device());
-    combined_proj_buffer = combined_proj_buffer.to(input.device());
-    
+    // Pre-size buffers before kernel launch
     if (down_proj_buffer.size(0) != batch_size) {
         down_proj_buffer.resize_({batch_size, hidden_size});
+        // Pre-fill to force allocation
+        down_proj_buffer.zero_();
     }
     if (combined_proj_buffer.size(0) != batch_size) {
         combined_proj_buffer.resize_({batch_size, concat_weight.size(0)});
+        // Pre-fill to force allocation
+        combined_proj_buffer.zero_();
     }
+
+    // Ensure all tensors are contiguous and properly laid out
+    auto input_contig = input.contiguous();
+    auto concat_weight_contig = concat_weight.contiguous();
+    auto active_down_weight_contig = active_down_weight.contiguous();
     
     const int threads = 256;
     const int blocks = batch_size;
     
+    // Use cudaStreamPerThread to avoid synchronization issues
+    cudaStream_t stream = at::cuda::getCurrentCUDAStream();
+    
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "sparse_mlp_forward_cuda", ([&] {
-        sparse_mlp_forward_cuda_kernel<scalar_t><<<blocks, threads>>>(
-            input.data_ptr<scalar_t>(),
-            concat_weight.data_ptr<scalar_t>(),
-            active_down_weight.data_ptr<scalar_t>(),
+        sparse_mlp_forward_cuda_kernel<scalar_t><<<blocks, threads, 0, stream>>>(
+            input_contig.data_ptr<scalar_t>(),
+            concat_weight_contig.data_ptr<scalar_t>(),
+            active_down_weight_contig.data_ptr<scalar_t>(),
             down_proj_buffer.data_ptr<scalar_t>(),
             combined_proj_buffer.data_ptr<scalar_t>(),
             batch_size,

@@ -19,30 +19,12 @@ namespace py = pybind11;
 #include <thread>
 #include <mutex>
 
-// Add timing utilities
-#include <chrono>
-
 // Add device check utilities
 #include <c10/cuda/CUDAGuard.h>
 
-// Add weight cache class with layer and batch support TODO Make it Model instance dependent
+// Add custom headers
 #include "weight_cache.h"
 
-class Timer {
-private:
-    std::chrono::high_resolution_clock::time_point start_time;
-
-public:
-    void start() {
-        start_time = std::chrono::high_resolution_clock::now();
-    }
-    
-    void stop(const std::string& timer_name) {
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
-        std::cout << timer_name << ": " << duration/1000.0 << "ms" << std::endl;
-    }
-};
 
 void compute_active_weights(
     const torch::Tensor& gate_weight,
@@ -50,10 +32,9 @@ void compute_active_weights(
     const torch::Tensor& down_weight,
     const torch::Tensor& mask) {
     int64_t batch_size = mask.size(0);
-    WeightCache::getInstance()->init(batch_size);
+    WeightCache::getInstance()->init(batch_size, mask.device());
     auto active_gate = gate_weight.narrow(0, 0, 1638).detach();
     auto active_up = up_weight.narrow(0, 0, 1638).detach();
-    
     // Concatenate gate and up weights
     auto concat_weights = torch::cat({active_gate, active_up}, 0);
     auto active_down = down_weight.narrow(1, 0, 1638).detach();
