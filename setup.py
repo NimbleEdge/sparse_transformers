@@ -56,11 +56,10 @@ cpu_compile_args = common_compile_args + [
 # CUDA-specific optimization flags
 cuda_compile_args = ['-O3', '--use_fast_math'] + arch_flags + [
     '--compiler-options', "'-fPIC'",
-    '--compiler-options', "'-fopenmp'",
+    '--compiler-options', "'-O3'",
     '--compiler-options', "'-march=native'",
     '--compiler-options', "'-ffast-math'",
-    '--compiler-options', "'-flto'",
-    '--compiler-options', "'-funroll-loops'",
+    '-std=c++17'  # Force C++17 instead of C++20
 ]
 
 # Link flags
@@ -75,14 +74,19 @@ extra_link_args = [
     '-Wl,--exclude-libs,ALL',   # Don't export any symbols from libraries
 ]
 
-class CustomBuildExtension(BuildExtension):
-    def get_ext_filename(self, ext_name):
-        filename = super().get_ext_filename(ext_name)
-        return str(build_dir / 'lib' / os.path.basename(filename))
-
-    def get_ext_fullpath(self, ext_name):
-        filename = self.get_ext_filename(ext_name)
-        return str(build_dir / 'lib' / filename)
+# Get CUDA include paths
+def get_cuda_include_dirs():
+    cuda_home = os.getenv('CUDA_HOME', '/usr/local/cuda')
+    if not os.path.exists(cuda_home):
+        cuda_home = os.getenv('CUDA_PATH')  # Windows
+    
+    if cuda_home is None:
+        raise RuntimeError("CUDA_HOME or CUDA_PATH environment variable is not set")
+        
+    return [
+        os.path.join(cuda_home, 'include'),
+        os.path.join(cuda_home, 'samples', 'common', 'inc')
+    ]
 
 # Base extension configuration
 base_include_dirs = [
@@ -92,37 +96,58 @@ base_include_dirs = [
     os.path.dirname(torch.__file__) + '/include/c10',
 ]
 
-ext_modules = [
-    CppExtension(
+if torch.cuda.is_available():
+    base_include_dirs.extend(get_cuda_include_dirs())
+
+# Define extensions
+ext_modules = []
+if torch.cuda.is_available():
+    extension = CUDAExtension(
+        name='sparse_mlp',
+        sources=[
+            'sparse_mlp/csrc/sparse_mlp_op.cpp',
+            'sparse_mlp/csrc/sparse_mlp_cuda.cu'
+        ],
+        include_dirs=base_include_dirs,
+        extra_compile_args={
+            'cxx': cpu_compile_args,
+            'nvcc': cuda_compile_args
+        },
+        extra_link_args=extra_link_args,
+        libraries=['gomp', 'cudart'],
+        library_dirs=[str(build_dir / 'lib')],
+        define_macros=[('WITH_CUDA', None)]
+    )
+else:
+    extension = CppExtension(
         name='sparse_mlp',
         sources=['sparse_mlp/csrc/sparse_mlp_op.cpp'],
         extra_compile_args=cpu_compile_args,
         extra_link_args=extra_link_args,
-        libraries=['gomp'],
-        include_dirs=base_include_dirs,
         library_dirs=[str(build_dir / 'lib')],
+        include_dirs=base_include_dirs,
+        libraries=['gomp']
     )
-]
 
-if torch.cuda.is_available():
-    ext_modules = [
-        CUDAExtension(
-            name='sparse_mlp',
-            sources=[
-                'sparse_mlp/csrc/sparse_mlp_op.cpp',
-                'sparse_mlp/csrc/sparse_mlp_cuda.cu'
-            ],
-            extra_compile_args={
-                'cxx': cpu_compile_args,
-                'nvcc': cuda_compile_args
-            },
-            extra_link_args=extra_link_args,
-            libraries=['gomp', 'cudart'],
-            include_dirs=base_include_dirs,
-            library_dirs=[str(build_dir / 'lib')],
-            define_macros=[('WITH_CUDA', None)]
-        )
-    ]
+ext_modules.append(extension)
+
+# Custom build extension to handle clean builds
+class CustomBuildExtension(BuildExtension):
+    def get_ext_filename(self, ext_name):
+        # Force output to build directory
+        filename = super().get_ext_filename(ext_name)
+        return str(build_dir / 'lib' / os.path.basename(filename))
+
+    def get_ext_fullpath(self, ext_name):
+        # Override to ensure extension is built in our build directory
+        filename = self.get_ext_filename(ext_name)
+        return str(build_dir / 'lib' / filename)
+    
+    def build_extensions(self):
+        # Clean old build files
+        if self.parallel:
+            self.parallel = False  # Disable parallel build for CUDA
+        super().build_extensions()
 
 setup(
     name='sparse_mlp',

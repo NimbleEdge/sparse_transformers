@@ -32,12 +32,12 @@ public:
         is_initialized = false;
     }
     
-    void init(int64_t batch_size, const torch::Device& device = torch::kCPU) {
+    void init(int64_t batch_size, const torch::Device& device = torch::kCPU, const c10::ScalarType dtype = torch::kFloat32) {
         clear();
         current_device = device;
         auto options = torch::TensorOptions()
             .device(current_device)
-            .dtype(torch::kFloat32);
+            .dtype(dtype);
         
         active_weights = torch::empty({2048, 3276}, options);
         active_downs = torch::empty({1638, 2048}, options);
@@ -45,13 +45,17 @@ public:
     }
     
     void store(const torch::Tensor& concat_weights, const torch::Tensor& down) {
-        // Move tensors to current device if needed
         active_weights = concat_weights.to(current_device);
         active_downs = down.to(current_device);
     }
     
-    std::tuple<torch::Tensor, torch::Tensor> get() {
-        return std::make_tuple(active_weights, active_downs);
+    // Separate getters instead of structured bindings
+    torch::Tensor get_concat_weight() const {
+        return active_weights;
+    }
+    
+    torch::Tensor get_active_down_weight() const {
+        return active_downs;
     }
     
     torch::Device device() const {

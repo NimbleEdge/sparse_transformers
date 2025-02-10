@@ -10,28 +10,28 @@ Running CUDA inference benchmarks...
 Warming up models...
 
 Model type: <class 'transformers.models.llama.modeling_llama.LlamaForCausalLM'>
-Model dtype: torch.float32
+Model dtype: torch.float16
 
 Model type: <class 'src.models.modelling_llama_skip.LlamaSkipConnectionForCausalLM'>
-Model dtype: torch.float32
+Model dtype: torch.float16
 
 Model type: <class 'src.models.modelling_llama_skip.LlamaSkipConnectionForCausalLM'>
-Model dtype: torch.float32
+Model dtype: torch.float16
 
 Model type: <class 'transformers.models.llama.modeling_llama.LlamaForCausalLM'>
-Model dtype: torch.float32
+Model dtype: torch.float16
 
 SkipLLaMA Scripted CUDA Results:
-Average time: 0.314s
-Min time: 0.313s
-Max time: 0.327s
-Individual times: ['0.322s', '0.315s', '0.314s', '0.314s', '0.314s', '0.314s', '0.314s', '0.314s', '0.321s', '0.314s', '0.314s', '0.315s', '0.314s', '0.314s', '0.314s', '0.314s', '0.314s', '0.314s', '0.314s', '0.314s', '0.314s', '0.315s', '0.314s', '0.314s', '0.314s', '0.314s', '0.314s', '0.314s', '0.314s', '0.314s', '0.314s', '0.315s', '0.314s', '0.313s', '0.314s', '0.314s', '0.314s', '0.314s', '0.314s', '0.314s', '0.314s', '0.315s', '0.314s', '0.314s', '0.314s', '0.314s', '0.314s', '0.313s', '0.316s', '0.327s']
+Average time: 0.108s
+Min time: 0.108s
+Max time: 0.108s
+Individual times: ['0.108s', '0.108s', '0.108s', '0.108s', '0.108s', '0.108s', '0.108s', '0.108s', '0.108s', '0.108s']
 
 Standard LLaMA CUDA Results:
-Average time: 0.053s
-Min time: 0.052s
-Max time: 0.057s
-Individual times: ['0.052s', '0.052s', '0.052s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.052s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.052s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.057s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s', '0.053s']
+Average time: 0.018s
+Min time: 0.018s
+Max time: 0.019s
+Individual times: ['0.019s', '0.019s', '0.018s', '0.018s', '0.018s', '0.018s', '0.018s', '0.018s', '0.018s', '0.018s']
 
 CUDA Speedups:
 Scripted vs Standard: 0.17x

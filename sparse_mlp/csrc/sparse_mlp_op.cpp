@@ -32,7 +32,7 @@ void compute_active_weights(
     const torch::Tensor& down_weight,
     const torch::Tensor& mask) {
     int64_t batch_size = mask.size(0);
-    WeightCache::getInstance()->init(batch_size, mask.device());
+    WeightCache::getInstance()->init(batch_size, mask.device(), mask.scalar_type());
     auto active_gate = gate_weight.narrow(0, 0, 1638).detach();
     auto active_up = up_weight.narrow(0, 0, 1638).detach();
     // Concatenate gate and up weights
@@ -94,7 +94,9 @@ torch::Tensor sparse_mlp_forward_cpu(
     // Process each batch item in parallel
     at::parallel_for(0, batch_size, 1, [&](int64_t start, int64_t end) {
         for (int64_t batch_idx = start; batch_idx < end; batch_idx++) {
-            auto [concat_weight, active_down_weight] = WeightCache::getInstance()->get();
+            auto cache = WeightCache::getInstance();
+            torch::Tensor concat_weight = cache->get_concat_weight();
+            torch::Tensor active_down_weight = cache->get_active_down_weight();
             int64_t gate_size = concat_weight.size(0) / 2;
             auto x_batch = input[batch_idx].unsqueeze(0).detach();
             
@@ -127,7 +129,8 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         .def_static("getInstance", &WeightCache::getInstance)
         .def("init", &WeightCache::init)
         .def("store", &WeightCache::store)
-        .def("get", &WeightCache::get)
+        .def("get_concat_weight", &WeightCache::get_concat_weight)
+        .def("get_active_down_weight", &WeightCache::get_active_down_weight)
         .def("clear", &WeightCache::clear)
         .def("__repr__", [](const WeightCache&) {
             return "WeightCache(singleton)";

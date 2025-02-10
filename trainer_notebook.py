@@ -98,11 +98,13 @@ def create_pipeline(model, **kwargs):
 llamaSkipScriptedPipe = create_pipeline(scripted_model)
 llamaPipe = create_pipeline(checkpoint)
 
-# Convert to float32
-llamaPipe.model.to(torch.float32)
-llamaSkipScriptedPipe.model.to(torch.float32)
-
 def run_inference(model, input_ids, attention_mask, tokenizer, num_runs=args.num_runs):
+    # Convert to float32
+    if device.type == 'cuda':
+        model.to(torch.float16)
+    else:
+        model.to(torch.float32)
+
     model = model.to(device)
     base_input_ids = input_ids.to(device)
     base_attention_mask = attention_mask.to(device)
@@ -112,17 +114,19 @@ def run_inference(model, input_ids, attention_mask, tokenizer, num_runs=args.num
     
     times = []
     mlp_times = []  # Track MLP times separately
-    for module in model.modules():
-        if isinstance(module, LlamaSkipMLP) or isinstance(module, LlamaMLP):
-            # Add forward hook to track MLP time
-            def forward_hook(module, input, output):
-                start = time.perf_counter()
-                result = module.forward(*input)
-                end = time.perf_counter()
-                mlp_times.append(end - start)
-                return result
+    if device.type == 'cpu':
+        for module in model.modules():
+            if isinstance(module, LlamaSkipMLP) or isinstance(module, LlamaMLP):
+                # Add forward hook to track MLP time
+                def forward_hook(module, input, output):
+                    start = time.perf_counter()
+                    result = module.forward(*input)
+                    end = time.perf_counter()
+                    mlp_times.append(end - start)
+                    return result
             
-            module.register_forward_hook(forward_hook)
+                module.register_forward_hook(forward_hook)
+
     # Pre-compile model if using CUDA
     if device.type == 'cuda':
         # Warmup runs with fixed input to trigger CUDA graph capture
@@ -210,8 +214,9 @@ print_results = lambda name, times: (
     print(f"Individual times: {[f'{t:.3f}s' for t in times]}")
 )
 
-# print_results("SkipLLaMA Scripted MLP", skip_scripted_mlp_times)
-# print_results("Standard LLaMA MLP", std_mlp_times)
+if device.type == 'cpu':
+    print_results("SkipLLaMA Scripted MLP", skip_scripted_mlp_times)
+    print_results("Standard LLaMA MLP", std_mlp_times)
 
 calc_speedup = lambda t1, t2: (sum(t1)/len(t1))/(sum(t2)/len(t2))
 
