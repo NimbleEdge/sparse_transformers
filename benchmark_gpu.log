@@ -2,7 +2,1393 @@ Some weights of LlamaSkipConnectionForCausalLM were not initialized from the mod
 You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
 Device set to use cuda
 Device set to use cuda
-Configuring for 8 CPU threads
+CUDA Kernel Timings:
+  Setup Time:      0.004 ms
+  Combined Kernel: 0.749 ms
+  Output Kernel:   0.642 ms
+  Total Time:      1.394 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.584 ms
+  Output Kernel:   0.627 ms
+  Total Time:      1.213 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.581 ms
+  Output Kernel:   0.619 ms
+  Total Time:      1.202 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.583 ms
+  Output Kernel:   0.635 ms
+  Total Time:      1.221 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.582 ms
+  Output Kernel:   0.639 ms
+  Total Time:      1.223 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.586 ms
+  Output Kernel:   0.608 ms
+  Total Time:      1.196 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.585 ms
+  Output Kernel:   0.607 ms
+  Total Time:      1.194 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.582 ms
+  Output Kernel:   0.626 ms
+  Total Time:      1.210 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.578 ms
+  Output Kernel:   0.586 ms
+  Total Time:      1.166 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.579 ms
+  Output Kernel:   0.629 ms
+  Total Time:      1.211 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.583 ms
+  Output Kernel:   0.646 ms
+  Total Time:      1.232 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.580 ms
+  Output Kernel:   0.602 ms
+  Total Time:      1.184 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.578 ms
+  Output Kernel:   0.637 ms
+  Total Time:      1.217 ms
+CUDA Kernel Timings:
+  Setup Time:      0.004 ms
+  Combined Kernel: 0.577 ms
+  Output Kernel:   0.611 ms
+  Total Time:      1.192 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.578 ms
+  Output Kernel:   0.623 ms
+  Total Time:      1.204 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.579 ms
+  Output Kernel:   0.605 ms
+  Total Time:      1.186 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.569 ms
+  Output Kernel:   0.624 ms
+  Total Time:      1.196 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.569 ms
+  Output Kernel:   0.613 ms
+  Total Time:      1.184 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.571 ms
+  Output Kernel:   0.596 ms
+  Total Time:      1.169 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.567 ms
+  Output Kernel:   0.589 ms
+  Total Time:      1.159 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.569 ms
+  Output Kernel:   0.618 ms
+  Total Time:      1.190 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.569 ms
+  Output Kernel:   0.590 ms
+  Total Time:      1.161 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.566 ms
+  Output Kernel:   0.618 ms
+  Total Time:      1.188 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.567 ms
+  Output Kernel:   0.588 ms
+  Total Time:      1.157 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.569 ms
+  Output Kernel:   0.590 ms
+  Total Time:      1.162 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.560 ms
+  Output Kernel:   0.613 ms
+  Total Time:      1.176 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.559 ms
+  Output Kernel:   0.553 ms
+  Total Time:      1.114 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.563 ms
+  Output Kernel:   0.602 ms
+  Total Time:      1.167 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.561 ms
+  Output Kernel:   0.614 ms
+  Total Time:      1.177 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.561 ms
+  Output Kernel:   0.600 ms
+  Total Time:      1.165 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.564 ms
+  Output Kernel:   0.608 ms
+  Total Time:      1.174 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.563 ms
+  Output Kernel:   0.596 ms
+  Total Time:      1.162 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.563 ms
+  Output Kernel:   0.625 ms
+  Total Time:      1.190 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.561 ms
+  Output Kernel:   0.587 ms
+  Total Time:      1.150 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.554 ms
+  Output Kernel:   0.602 ms
+  Total Time:      1.159 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.561 ms
+  Output Kernel:   0.570 ms
+  Total Time:      1.133 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.557 ms
+  Output Kernel:   0.599 ms
+  Total Time:      1.159 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.555 ms
+  Output Kernel:   0.586 ms
+  Total Time:      1.143 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.561 ms
+  Output Kernel:   0.588 ms
+  Total Time:      1.151 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.559 ms
+  Output Kernel:   0.580 ms
+  Total Time:      1.141 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.554 ms
+  Output Kernel:   0.584 ms
+  Total Time:      1.140 ms
+CUDA Kernel Timings:
+  Setup Time:      0.004 ms
+  Combined Kernel: 0.557 ms
+  Output Kernel:   0.595 ms
+  Total Time:      1.155 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.555 ms
+  Output Kernel:   0.602 ms
+  Total Time:      1.159 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.559 ms
+  Output Kernel:   0.581 ms
+  Total Time:      1.142 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.559 ms
+  Output Kernel:   0.565 ms
+  Total Time:      1.126 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.559 ms
+  Output Kernel:   0.608 ms
+  Total Time:      1.171 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.560 ms
+  Output Kernel:   0.600 ms
+  Total Time:      1.163 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.555 ms
+  Output Kernel:   0.584 ms
+  Total Time:      1.142 ms
+CUDA Kernel Timings:
+  Setup Time:      0.004 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.573 ms
+  Total Time:      1.128 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.557 ms
+  Total Time:      1.111 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.593 ms
+  Total Time:      1.147 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.595 ms
+  Total Time:      1.151 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.554 ms
+  Output Kernel:   0.586 ms
+  Total Time:      1.143 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.564 ms
+  Total Time:      1.118 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.555 ms
+  Output Kernel:   0.554 ms
+  Total Time:      1.112 ms
+CUDA Kernel Timings:
+  Setup Time:      0.004 ms
+  Combined Kernel: 0.554 ms
+  Output Kernel:   0.584 ms
+  Total Time:      1.141 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.610 ms
+  Total Time:      1.164 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.555 ms
+  Output Kernel:   0.605 ms
+  Total Time:      1.162 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.547 ms
+  Output Kernel:   0.580 ms
+  Total Time:      1.130 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.582 ms
+  Total Time:      1.137 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.557 ms
+  Output Kernel:   0.555 ms
+  Total Time:      1.114 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.582 ms
+  Total Time:      1.137 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.574 ms
+  Total Time:      1.128 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.583 ms
+  Total Time:      1.137 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.554 ms
+  Output Kernel:   0.576 ms
+  Total Time:      1.133 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.557 ms
+  Output Kernel:   0.595 ms
+  Total Time:      1.155 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.556 ms
+  Output Kernel:   0.587 ms
+  Total Time:      1.145 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.555 ms
+  Output Kernel:   0.590 ms
+  Total Time:      1.147 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.557 ms
+  Output Kernel:   0.557 ms
+  Total Time:      1.116 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.560 ms
+  Total Time:      1.116 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.555 ms
+  Output Kernel:   0.566 ms
+  Total Time:      1.122 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.579 ms
+  Total Time:      1.133 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.556 ms
+  Output Kernel:   0.562 ms
+  Total Time:      1.120 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.604 ms
+  Total Time:      1.160 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.557 ms
+  Output Kernel:   0.573 ms
+  Total Time:      1.132 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.598 ms
+  Total Time:      1.151 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.577 ms
+  Total Time:      1.130 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.564 ms
+  Total Time:      1.118 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.595 ms
+  Total Time:      1.149 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.589 ms
+  Total Time:      1.143 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.555 ms
+  Output Kernel:   0.581 ms
+  Total Time:      1.138 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.572 ms
+  Total Time:      1.126 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.563 ms
+  Total Time:      1.118 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.555 ms
+  Output Kernel:   0.567 ms
+  Total Time:      1.124 ms
+CUDA Kernel Timings:
+  Setup Time:      0.004 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.606 ms
+  Total Time:      1.162 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.575 ms
+  Total Time:      1.129 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.555 ms
+  Output Kernel:   0.573 ms
+  Total Time:      1.130 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.570 ms
+  Total Time:      1.124 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.555 ms
+  Output Kernel:   0.566 ms
+  Total Time:      1.123 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.556 ms
+  Output Kernel:   0.582 ms
+  Total Time:      1.140 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.555 ms
+  Output Kernel:   0.549 ms
+  Total Time:      1.106 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.593 ms
+  Total Time:      1.148 ms
+CUDA Kernel Timings:
+  Setup Time:      0.004 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.586 ms
+  Total Time:      1.141 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.578 ms
+  Total Time:      1.133 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.621 ms
+  Total Time:      1.176 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.588 ms
+  Total Time:      1.139 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.606 ms
+  Total Time:      1.161 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.598 ms
+  Total Time:      1.153 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.586 ms
+  Total Time:      1.141 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.574 ms
+  Total Time:      1.129 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.576 ms
+  Total Time:      1.131 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.555 ms
+  Total Time:      1.110 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.598 ms
+  Total Time:      1.153 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.601 ms
+  Total Time:      1.157 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.558 ms
+  Output Kernel:   0.588 ms
+  Total Time:      1.149 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.581 ms
+  Total Time:      1.134 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.570 ms
+  Total Time:      1.123 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.596 ms
+  Total Time:      1.151 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.551 ms
+  Total Time:      1.102 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.597 ms
+  Total Time:      1.149 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.586 ms
+  Total Time:      1.141 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.548 ms
+  Output Kernel:   0.592 ms
+  Total Time:      1.143 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.601 ms
+  Total Time:      1.156 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.602 ms
+  Total Time:      1.156 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.581 ms
+  Total Time:      1.133 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.554 ms
+  Output Kernel:   0.558 ms
+  Total Time:      1.114 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.579 ms
+  Total Time:      1.135 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.567 ms
+  Total Time:      1.121 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.547 ms
+  Output Kernel:   0.580 ms
+  Total Time:      1.129 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.585 ms
+  Total Time:      1.138 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.588 ms
+  Total Time:      1.142 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.588 ms
+  Total Time:      1.145 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.570 ms
+  Total Time:      1.122 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.555 ms
+  Output Kernel:   0.588 ms
+  Total Time:      1.145 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.554 ms
+  Output Kernel:   0.565 ms
+  Total Time:      1.122 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.553 ms
+  Total Time:      1.106 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.582 ms
+  Total Time:      1.137 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.582 ms
+  Total Time:      1.135 ms
+CUDA Kernel Timings:
+  Setup Time:      0.004 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.562 ms
+  Total Time:      1.118 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.588 ms
+  Total Time:      1.142 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.566 ms
+  Total Time:      1.118 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.571 ms
+  Total Time:      1.124 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.617 ms
+  Total Time:      1.174 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.590 ms
+  Total Time:      1.145 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.585 ms
+  Total Time:      1.139 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.589 ms
+  Total Time:      1.141 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.595 ms
+  Total Time:      1.148 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.568 ms
+  Total Time:      1.123 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.595 ms
+  Total Time:      1.149 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.574 ms
+  Total Time:      1.126 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.608 ms
+  Total Time:      1.163 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.555 ms
+  Output Kernel:   0.554 ms
+  Total Time:      1.111 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.602 ms
+  Total Time:      1.156 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.567 ms
+  Total Time:      1.122 ms
+CUDA Kernel Timings:
+  Setup Time:      0.004 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.574 ms
+  Total Time:      1.128 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.578 ms
+  Total Time:      1.131 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.555 ms
+  Output Kernel:   0.584 ms
+  Total Time:      1.141 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.579 ms
+  Total Time:      1.130 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.555 ms
+  Output Kernel:   0.600 ms
+  Total Time:      1.157 ms
+CUDA Kernel Timings:
+  Setup Time:      0.004 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.588 ms
+  Total Time:      1.143 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.557 ms
+  Total Time:      1.112 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.583 ms
+  Total Time:      1.135 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.572 ms
+  Total Time:      1.126 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.578 ms
+  Total Time:      1.133 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.605 ms
+  Total Time:      1.158 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.560 ms
+  Total Time:      1.113 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.588 ms
+  Total Time:      1.143 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.598 ms
+  Total Time:      1.152 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.606 ms
+  Total Time:      1.161 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.567 ms
+  Total Time:      1.120 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.591 ms
+  Total Time:      1.146 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.602 ms
+  Total Time:      1.155 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.554 ms
+  Output Kernel:   0.569 ms
+  Total Time:      1.126 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.582 ms
+  Total Time:      1.137 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.594 ms
+  Total Time:      1.147 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.573 ms
+  Total Time:      1.129 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.547 ms
+  Output Kernel:   0.600 ms
+  Total Time:      1.149 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.600 ms
+  Total Time:      1.155 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.556 ms
+  Total Time:      1.109 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.603 ms
+  Total Time:      1.156 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.548 ms
+  Output Kernel:   0.558 ms
+  Total Time:      1.108 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.565 ms
+  Total Time:      1.119 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.548 ms
+  Output Kernel:   0.580 ms
+  Total Time:      1.131 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.590 ms
+  Total Time:      1.143 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.592 ms
+  Total Time:      1.145 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.590 ms
+  Total Time:      1.143 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.597 ms
+  Total Time:      1.148 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.576 ms
+  Total Time:      1.130 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.589 ms
+  Total Time:      1.143 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.581 ms
+  Total Time:      1.134 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.610 ms
+  Total Time:      1.165 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.593 ms
+  Total Time:      1.147 ms
+CUDA Kernel Timings:
+  Setup Time:      0.004 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.606 ms
+  Total Time:      1.163 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.589 ms
+  Total Time:      1.142 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.581 ms
+  Total Time:      1.134 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.565 ms
+  Total Time:      1.117 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.584 ms
+  Total Time:      1.138 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.580 ms
+  Total Time:      1.133 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.556 ms
+  Output Kernel:   0.576 ms
+  Total Time:      1.135 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.562 ms
+  Total Time:      1.116 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.583 ms
+  Total Time:      1.136 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.563 ms
+  Total Time:      1.116 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.569 ms
+  Total Time:      1.124 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.555 ms
+  Total Time:      1.109 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.580 ms
+  Total Time:      1.132 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.588 ms
+  Total Time:      1.143 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.575 ms
+  Total Time:      1.128 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.575 ms
+  Total Time:      1.130 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.586 ms
+  Total Time:      1.139 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.567 ms
+  Total Time:      1.118 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.572 ms
+  Total Time:      1.125 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.548 ms
+  Output Kernel:   0.595 ms
+  Total Time:      1.146 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.570 ms
+  Total Time:      1.124 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.575 ms
+  Total Time:      1.127 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.588 ms
+  Total Time:      1.139 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.594 ms
+  Total Time:      1.149 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.580 ms
+  Total Time:      1.133 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.573 ms
+  Total Time:      1.125 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.598 ms
+  Total Time:      1.150 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.569 ms
+  Total Time:      1.124 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.578 ms
+  Total Time:      1.130 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.591 ms
+  Total Time:      1.143 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.586 ms
+  Total Time:      1.141 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.567 ms
+  Total Time:      1.120 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.597 ms
+  Total Time:      1.152 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.583 ms
+  Total Time:      1.135 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.592 ms
+  Total Time:      1.147 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.569 ms
+  Total Time:      1.122 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.547 ms
+  Output Kernel:   0.584 ms
+  Total Time:      1.133 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.567 ms
+  Total Time:      1.118 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.577 ms
+  Total Time:      1.130 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.602 ms
+  Total Time:      1.157 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.584 ms
+  Total Time:      1.138 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.559 ms
+  Output Kernel:   0.579 ms
+  Total Time:      1.140 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.588 ms
+  Total Time:      1.143 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.599 ms
+  Total Time:      1.151 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.589 ms
+  Total Time:      1.142 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.590 ms
+  Total Time:      1.141 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.555 ms
+  Total Time:      1.107 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.573 ms
+  Total Time:      1.126 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.606 ms
+  Total Time:      1.160 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.547 ms
+  Output Kernel:   0.588 ms
+  Total Time:      1.138 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.588 ms
+  Total Time:      1.143 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.615 ms
+  Total Time:      1.169 ms
+CUDA Kernel Timings:
+  Setup Time:      0.004 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.575 ms
+  Total Time:      1.130 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.606 ms
+  Total Time:      1.159 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.587 ms
+  Total Time:      1.140 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.551 ms
+  Total Time:      1.104 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.593 ms
+  Total Time:      1.149 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.584 ms
+  Total Time:      1.139 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.582 ms
+  Total Time:      1.137 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.560 ms
+  Total Time:      1.112 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.580 ms
+  Total Time:      1.133 ms
+CUDA Kernel Timings:
+  Setup Time:      0.004 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.581 ms
+  Total Time:      1.134 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.563 ms
+  Total Time:      1.118 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.596 ms
+  Total Time:      1.149 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.592 ms
+  Total Time:      1.144 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.555 ms
+  Output Kernel:   0.604 ms
+  Total Time:      1.161 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.584 ms
+  Total Time:      1.136 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.590 ms
+  Total Time:      1.143 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.571 ms
+  Total Time:      1.124 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.554 ms
+  Output Kernel:   0.607 ms
+  Total Time:      1.163 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.563 ms
+  Total Time:      1.114 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.547 ms
+  Output Kernel:   0.565 ms
+  Total Time:      1.116 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.581 ms
+  Total Time:      1.137 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.571 ms
+  Total Time:      1.124 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.586 ms
+  Total Time:      1.139 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.548 ms
+  Output Kernel:   0.550 ms
+  Total Time:      1.100 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.590 ms
+  Total Time:      1.143 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.571 ms
+  Total Time:      1.127 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.605 ms
+  Total Time:      1.159 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.575 ms
+  Total Time:      1.129 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.568 ms
+  Total Time:      1.122 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.584 ms
+  Total Time:      1.137 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.581 ms
+  Total Time:      1.134 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.585 ms
+  Total Time:      1.138 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.586 ms
+  Total Time:      1.139 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.565 ms
+  Total Time:      1.118 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.564 ms
+  Total Time:      1.118 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.571 ms
+  Total Time:      1.124 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.612 ms
+  Total Time:      1.166 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.557 ms
+  Output Kernel:   0.563 ms
+  Total Time:      1.122 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.596 ms
+  Total Time:      1.150 ms
+CUDA Kernel Timings:
+  Setup Time:      0.004 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.596 ms
+  Total Time:      1.149 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.593 ms
+  Total Time:      1.148 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.586 ms
+  Total Time:      1.138 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.552 ms
+  Output Kernel:   0.571 ms
+  Total Time:      1.126 ms
+CUDA Kernel Timings:
+  Configuring for 8 CPU threads
 Using device: cuda
 
 Running CUDA inference benchmarks...
@@ -22,16 +1408,70 @@ Model type: <class 'transformers.models.llama.modeling_llama.LlamaForCausalLM'>
 Model dtype: torch.float16
 
 SkipLLaMA Scripted CUDA Results:
-Average time: 0.108s
-Min time: 0.108s
-Max time: 0.108s
-Individual times: ['0.108s', '0.108s', '0.108s', '0.108s', '0.108s', '0.108s', '0.108s', '0.108s', '0.108s', '0.108s']
+Average time: 0.037s
+Min time: 0.037s
+Max time: 0.038s
+Individual times: ['0.038s', '0.038s', '0.037s', '0.037s', '0.037s', '0.037s', '0.037s', '0.037s', '0.037s', '0.037s']
 
 Standard LLaMA CUDA Results:
 Average time: 0.018s
 Min time: 0.018s
-Max time: 0.019s
-Individual times: ['0.019s', '0.019s', '0.018s', '0.018s', '0.018s', '0.018s', '0.018s', '0.018s', '0.018s', '0.018s']
+Max time: 0.018s
+Individual times: ['0.018s', '0.018s', '0.018s', '0.018s', '0.018s', '0.018s', '0.018s', '0.018s', '0.018s', '0.018s']
 
 CUDA Speedups:
-Scripted vs Standard: 0.17x
+Scripted vs Standard: 0.48x
+Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.564 ms
+  Total Time:      1.118 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.575 ms
+  Total Time:      1.127 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.585 ms
+  Total Time:      1.139 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.584 ms
+  Total Time:      1.138 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.553 ms
+  Output Kernel:   0.563 ms
+  Total Time:      1.118 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.593 ms
+  Total Time:      1.146 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.554 ms
+  Output Kernel:   0.612 ms
+  Total Time:      1.169 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.595 ms
+  Total Time:      1.147 ms
+CUDA Kernel Timings:
+  Setup Time:      0.003 ms
+  Combined Kernel: 0.549 ms
+  Output Kernel:   0.574 ms
+  Total Time:      1.126 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.551 ms
+  Output Kernel:   0.587 ms
+  Total Time:      1.140 ms
+CUDA Kernel Timings:
+  Setup Time:      0.002 ms
+  Combined Kernel: 0.550 ms
+  Output Kernel:   0.561 ms
+  Total Time:      1.113 ms
