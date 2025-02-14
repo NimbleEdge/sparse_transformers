@@ -1,5 +1,6 @@
 {
   "_name_or_path": "meta-llama/Llama-3.2-1B-Instruct",
+  "sparsity": 0.1,
   "architectures": [
     "LlamaSkipConnectionForCausalLM"
   ],

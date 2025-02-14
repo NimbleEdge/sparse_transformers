@@ -10,41 +10,81 @@ This project implements and optimizes sparse MLP operations in LLaMA models usin
 - Parallel processing optimizations
 - Memory layout optimizations
 
-## Performance Results
+## Installation
 
-### Model Comparison
+1. Requirements:
+```bash
+torch>=1.10.0
+transformers>=4.20.0
+ninja
+```
+
+2. Build C++ extensions:
+```bash
+# Install in editable mode
+pip install -e .
+```
+
+3. Verify installation:
+```bash
+python -c "import sparse_mlp; print('Installation successful!')"
+```
+
+## Usage
+
+### Running Benchmarks
+
+```bash
+# Run on CUDA with config and verbose output
+python trainer_notebook.py \
+    --device cuda \
+    --config configs/llama_skip_causal_3b.json \
+    --num_runs 50 \
+    --verbose True
+
+# Run on CPU with timing details
+python trainer_notebook.py \
+    --device cpu \
+    --config configs/llama_skip_causal_3b.json \
+    --verbose True
+```
+
+Available arguments:
+- `--device`: Device to run on (`cuda` or `cpu`, default: `cpu`)
+- `--config`: Path to model config file (default: `configs/llama_skip_causal_3b.json`)
+- `--num_runs`: Number of inference runs (default: 50)
+- `--verbose`: Enable detailed timing output (default: False)
+
+### Latest Performance Results
+
+#### CUDA Performance
 ```
 Standard LLaMA:
-- Average time: 0.515s
-- Min: 0.495s
-- Max: 0.537s
-- Variance: ~8%
+- Average time: 0.018s
+- Min: 0.017s
+- Max: 0.018s
 
 SkipLLaMA Scripted:
-- Average time: 0.404s
-- Min: 0.392s
-- Max: 0.421s
-- Variance: ~7%
+- Average time: 0.021s
+- Min: 0.021s
+- Max: 0.021s
 
-Speedup: ~1.27x [WIP] faster
+Current CUDA speedup: 0.85x (optimization in progress)
 ```
 
-### Custom Operation Breakdown
+#### CPU Performance
 ```
-1. Weight Selection:
-   - Original: 20-25ms
-   - Optimized: 5-7ms
-   - Improvement: ~4x
+Standard LLaMA:
+- Average time: 1.824s
+- Min: 1.095s
+- Max: 6.964s
 
-2. Matrix Multiplications:
-   - Original: 4-6ms
-   - Optimized: 2-3ms
-   - Improvement: ~2x
+SkipLLaMA Scripted:
+- Average time: 1.095s
+- Min: 0.741s
+- Max: 4.726s
 
-3. Total Processing:
-   - Original: 60-80ms
-   - Optimized: 8-10ms
-   - Overall Improvement: ~7x
+CPU speedup: 1.67x
 ```
 
 ## Implementation Details
@@ -70,99 +110,24 @@ class LlamaSkipConnectionForCausalLM(PreTrainedModel):
         self.model = LlamaSkipModel(config)
 ```
 
-### Key Optimizations
-
-1. Memory Management:
-```cpp
-auto options = torch::TensorOptions()
-    .dtype(torch::kFloat32)
-    .device(x.device())
-    .layout(torch::kStrided);
-```
-
-2. Parallel Processing:
-```cpp
-at::parallel_for(0, batch_size, 1, [&](int64_t start, int64_t end) {
-    // Batch processing
-});
-```
-
-## Installation
-
-1. Requirements:
-```bash
-torch>=1.10.0
-transformers>=4.20.0
-ninja
-```
-
-2. Build C++ extensions:
-```bash
-# Clone repository
-git clone https://github.com/username/llama-skip
-cd llama-skip
-
-# Install in editable mode
-pip install -e .
-```
-
-3. Verify installation:
-```bash
-python -c "import sparse_mlp; print('Installation successful!')"
-```
-
-## Usage
-
-### Quick Start
-
-```python
-from src.models.modelling_llama_skip import LlamaSkipConnectionForCausalLM
-from src.models.configuration_llama_skip import LlamaSkipConnectionConfig
-
-# Load model
-config = LlamaSkipConnectionConfig.from_pretrained("model_id")
-model = LlamaSkipConnectionForCausalLM.from_pretrained(
-    "checkpoint",
-    config=config
-)
-
-# Enable optimizations
-model.eval()
-scripted_model = torch.jit.script(model)
-```
-
 ## Project Structure
 
 ```
 ├── sparse_mlp/
 │   └── csrc/
 │       ├── sparse_mlp_op.cpp    # C++ implementation
-│       └── sparse_mlp_op.h      # Header file
+│       ├── sparse_mlp_cuda.cu   # CUDA kernels
+│       ├── weight_cache.h       # Weight caching
+│       └── timer.h             # Timing utilities
 ├── src/
 │   └── models/
 │       ├── modelling_llama_skip.py      # PyTorch model
 │       └── configuration_llama_skip.py   # Model config
+├── configs/
+│   ├── llama_skip_causal_1b.json        # 1B model config
+│   └── llama_skip_causal_3b.json        # 3B model config
 ├── setup.py                     # Build script
 └── README.md
-```
-
-## Benchmarking
-
-### Running Benchmarks
-
-1. Detailed profiling with logging:
-```bash
-# Run trainer notebook with timing output
-python trainer_notebook.py 2>&1 | tee benchmark.log
-```
-
-### Sample Benchmark Output
-```
-Weight Selection: 5.136ms
-Matrix Multiplications: 1.513ms
-Activation: 0.098ms
-Final Projection: 0.738ms
-Total Processing: 7.645ms
 ```
 
 ## Contributing
@@ -175,7 +140,7 @@ Total Processing: 7.645ms
 ## Citation
 
 If you use this code, please cite:
-```bibtex:README.md
+```bibtex
 @software{llama_skip_connection,
   title = {LLaMA Skip Connection Optimization},
   year = {2024},
