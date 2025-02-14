@@ -43,7 +43,6 @@ class FastLoRAProjection(nn.Module):
         self.hidden_size = hidden_size
         self.intermediate_size = intermediate_size
         self.lora_size = lora_size
-        
         self.down = nn.Linear(hidden_size, lora_size, bias=False)
         self.up = nn.Linear(lora_size, intermediate_size, bias=False)
         
@@ -74,15 +73,15 @@ class FastLoRAProjection(nn.Module):
         return self.output.mul(mask)
 
 class LlamaSkipMLP(nn.Module):
-    def __init__(self, hidden_size: int, intermediate_size: int, bias: bool = False):
+    def __init__(self, hidden_size: int, intermediate_size: int, sparsity: float, bias: bool = False):
         super().__init__()
         self.gate_proj = nn.Linear(hidden_size, intermediate_size, bias=bias)
         self.up_proj = nn.Linear(hidden_size, intermediate_size, bias=bias)
         self.down_proj = nn.Linear(intermediate_size, hidden_size, bias=bias)
-        
+        self.sparsity = sparsity
         # Register buffers for MLP computation
         self.register_buffer('down_proj_buffer', torch.zeros(14, hidden_size, requires_grad=False))
-        self.register_buffer('combined_proj_buffer', torch.zeros(14, 2 * 1638, requires_grad=False))  # max_gate_size = 1638
+        self.register_buffer('combined_proj_buffer', torch.zeros(14, 2 * int(intermediate_size * sparsity), requires_grad=False))  # max_gate_size = 1638
 
     def to(self, *args, **kwargs):
         # Move buffers to same device as model when .to() is called
@@ -105,17 +104,17 @@ class LlamaSkipDecoderLayer(LlamaDecoderLayer):
         self.mlp = LlamaSkipMLP(
             config.hidden_size,
             config.intermediate_size,
+            config.sparsity,
             config.mlp_bias
         )
         self.layer_idx = layer_idx
-        
+        self.sparsity = config.sparsity
         # Add mask for MLP weights - initialize on CPU first
         self.register_buffer('mlp_mask', torch.zeros(
             config.intermediate_size,
             dtype=torch.bool
         ).contiguous())
-        self.mlp_mask[:int(config.intermediate_size * 0.2)] = True  # 20% sparsity
-        
+        self.mlp_mask[:int(config.intermediate_size * self.sparsity)] = True  # 10% sparsity
         # Create LoRA projection
         self.lora_size = int(config.intermediate_size * 0.04)
         self.mlp_lora_proj = FastLoRAProjection(
@@ -149,14 +148,13 @@ class LlamaSkipDecoderLayer(LlamaDecoderLayer):
         hidden_states_reshaped = hidden_states.view(-1, hidden_states.shape[-1])
         
         # LoRA projection
-        lora_proj_mask = self.mlp_lora_proj(hidden_states_reshaped, self.mlp_mask)    
-
+        lora_proj_mask = self.mlp_lora_proj(hidden_states_reshaped, self.mlp_mask)
         # Compute weights
         compute_active_weights(
             self.mlp.gate_proj.weight.detach(),
             self.mlp.up_proj.weight.detach(),
             self.mlp.down_proj.weight.detach(),
-            lora_proj_mask
+            lora_proj_mask[:, :int(self.mlp.gate_proj.weight.shape[0] * self.sparsity)]
         )
 
         # Self Attention
@@ -471,6 +469,15 @@ class LlamaSkipConnectionModel(LlamaSkipPreTrainedModel):
 
 class LlamaSkipConnectionForCausalLM(LlamaSkipPreTrainedModel, GenerationMixin):
     _tied_weights_keys = ["lm_head.weight"]
+    _keys_to_ignore_on_load_missing = [
+        "model.layers.*.mlp.combined_proj_buffer",
+        "model.layers.*.mlp.down_proj_buffer",
+        "model.layers.*.mlp_lora_proj.down.weight",
+        "model.layers.*.mlp_lora_proj.intermediate",
+        "model.layers.*.mlp_lora_proj.output", 
+        "model.layers.*.mlp_lora_proj.up.weight",
+        "model.layers.*.mlp_mask"
+    ]
 
     def __init__(self, config):
         super().__init__(config)

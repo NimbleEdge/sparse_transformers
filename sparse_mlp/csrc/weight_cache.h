@@ -32,15 +32,15 @@ public:
         is_initialized = false;
     }
     
-    void init(int64_t batch_size, const torch::Device& device = torch::kCPU, const c10::ScalarType dtype = torch::kFloat32) {
+    void init(const torch::Tensor& mask, int64_t hidden_size) {
         clear();
-        current_device = device;
+        current_device = mask.device();
         auto options = torch::TensorOptions()
             .device(current_device)
-            .dtype(dtype);
+            .dtype(mask.scalar_type());
         
-        active_weights = torch::empty({2048, 3276}, options);
-        active_downs = torch::empty({1638, 2048}, options);
+        active_weights = torch::empty({hidden_size, 2*mask.size(1)}, options);
+        active_downs = torch::empty({mask.size(1), hidden_size}, options);
         is_initialized = true;
     }
     

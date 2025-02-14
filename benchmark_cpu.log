@@ -1,9 +1,9 @@
-Some weights of LlamaSkipConnectionForCausalLM were not initialized from the model checkpoint at meta-llama/Llama-3.2-1B-Instruct and are newly initialized: ['model.layers.0.mlp.combined_proj_buffer', 'model.layers.0.mlp.down_proj_buffer', 'model.layers.0.mlp_lora_proj.down.weight', 'model.layers.0.mlp_lora_proj.intermediate', 'model.layers.0.mlp_lora_proj.output', 'model.layers.0.mlp_lora_proj.up.weight', 'model.layers.0.mlp_mask', 'model.layers.1.mlp.combined_proj_buffer', 'model.layers.1.mlp.down_proj_buffer', 'model.layers.1.mlp_lora_proj.down.weight', 'model.layers.1.mlp_lora_proj.intermediate', 'model.layers.1.mlp_lora_proj.output', 'model.layers.1.mlp_lora_proj.up.weight', 'model.layers.1.mlp_mask', 'model.layers.10.mlp.combined_proj_buffer', 'model.layers.10.mlp.down_proj_buffer', 'model.layers.10.mlp_lora_proj.down.weight', 'model.layers.10.mlp_lora_proj.intermediate', 'model.layers.10.mlp_lora_proj.output', 'model.layers.10.mlp_lora_proj.up.weight', 'model.layers.10.mlp_mask', 'model.layers.11.mlp.combined_proj_buffer', 'model.layers.11.mlp.down_proj_buffer', 'model.layers.11.mlp_lora_proj.down.weight', 'model.layers.11.mlp_lora_proj.intermediate', 'model.layers.11.mlp_lora_proj.output', 'model.layers.11.mlp_lora_proj.up.weight', 'model.layers.11.mlp_mask', 'model.layers.12.mlp.combined_proj_buffer', 'model.layers.12.mlp.down_proj_buffer', 'model.layers.12.mlp_lora_proj.down.weight', 'model.layers.12.mlp_lora_proj.intermediate', 'model.layers.12.mlp_lora_proj.output', 'model.layers.12.mlp_lora_proj.up.weight', 'model.layers.12.mlp_mask', 'model.layers.13.mlp.combined_proj_buffer', 'model.layers.13.mlp.down_proj_buffer', 'model.layers.13.mlp_lora_proj.down.weight', 'model.layers.13.mlp_lora_proj.intermediate', 'model.layers.13.mlp_lora_proj.output', 'model.layers.13.mlp_lora_proj.up.weight', 'model.layers.13.mlp_mask', 'model.layers.14.mlp.combined_proj_buffer', 'model.layers.14.mlp.down_proj_buffer', 'model.layers.14.mlp_lora_proj.down.weight', 'model.layers.14.mlp_lora_proj.intermediate', 'model.layers.14.mlp_lora_proj.output', 'model.layers.14.mlp_lora_proj.up.weight', 'model.layers.14.mlp_mask', 'model.layers.15.mlp.combined_proj_buffer', 'model.layers.15.mlp.down_proj_buffer', 'model.layers.15.mlp_lora_proj.down.weight', 'model.layers.15.mlp_lora_proj.intermediate', 'model.layers.15.mlp_lora_proj.output', 'model.layers.15.mlp_lora_proj.up.weight', 'model.layers.15.mlp_mask', 'model.layers.2.mlp.combined_proj_buffer', 'model.layers.2.mlp.down_proj_buffer', 'model.layers.2.mlp_lora_proj.down.weight', 'model.layers.2.mlp_lora_proj.intermediate', 'model.layers.2.mlp_lora_proj.output', 'model.layers.2.mlp_lora_proj.up.weight', 'model.layers.2.mlp_mask', 'model.layers.3.mlp.combined_proj_buffer', 'model.layers.3.mlp.down_proj_buffer', 'model.layers.3.mlp_lora_proj.down.weight', 'model.layers.3.mlp_lora_proj.intermediate', 'model.layers.3.mlp_lora_proj.output', 'model.layers.3.mlp_lora_proj.up.weight', 'model.layers.3.mlp_mask', 'model.layers.4.mlp.combined_proj_buffer', 'model.layers.4.mlp.down_proj_buffer', 'model.layers.4.mlp_lora_proj.down.weight', 'model.layers.4.mlp_lora_proj.intermediate', 'model.layers.4.mlp_lora_proj.output', 'model.layers.4.mlp_lora_proj.up.weight', 'model.layers.4.mlp_mask', 'model.layers.5.mlp.combined_proj_buffer', 'model.layers.5.mlp.down_proj_buffer', 'model.layers.5.mlp_lora_proj.down.weight', 'model.layers.5.mlp_lora_proj.intermediate', 'model.layers.5.mlp_lora_proj.output', 'model.layers.5.mlp_lora_proj.up.weight', 'model.layers.5.mlp_mask', 'model.layers.6.mlp.combined_proj_buffer', 'model.layers.6.mlp.down_proj_buffer', 'model.layers.6.mlp_lora_proj.down.weight', 'model.layers.6.mlp_lora_proj.intermediate', 'model.layers.6.mlp_lora_proj.output', 'model.layers.6.mlp_lora_proj.up.weight', 'model.layers.6.mlp_mask', 'model.layers.7.mlp.combined_proj_buffer', 'model.layers.7.mlp.down_proj_buffer', 'model.layers.7.mlp_lora_proj.down.weight', 'model.layers.7.mlp_lora_proj.intermediate', 'model.layers.7.mlp_lora_proj.output', 'model.layers.7.mlp_lora_proj.up.weight', 'model.layers.7.mlp_mask', 'model.layers.8.mlp.combined_proj_buffer', 'model.layers.8.mlp.down_proj_buffer', 'model.layers.8.mlp_lora_proj.down.weight', 'model.layers.8.mlp_lora_proj.intermediate', 'model.layers.8.mlp_lora_proj.output', 'model.layers.8.mlp_lora_proj.up.weight', 'model.layers.8.mlp_mask', 'model.layers.9.mlp.combined_proj_buffer', 'model.layers.9.mlp.down_proj_buffer', 'model.layers.9.mlp_lora_proj.down.weight', 'model.layers.9.mlp_lora_proj.intermediate', 'model.layers.9.mlp_lora_proj.output', 'model.layers.9.mlp_lora_proj.up.weight', 'model.layers.9.mlp_mask']
-You should probably TRAIN this model on a down-stream task to be able to use it for predictions and inference.
-Device set to use cpu
-Device set to use cpu
 Configuring for 8 CPU threads
 Using device: cpu
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  1.07it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.26it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.23it/s]
+Device set to use cpu
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  1.14it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.28it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:01<00:00,  1.26it/s]
+Device set to use cpu
 
 Running CPU inference benchmarks...
 --------------------------------------------------
@@ -11,39 +11,31 @@ Warming up models...
 
 Model type: <class 'transformers.models.llama.modeling_llama.LlamaForCausalLM'>
 Model dtype: torch.float32
+Model path: meta-llama/Llama-3.2-3B-Instruct
 
 Model type: <class 'src.models.modelling_llama_skip.LlamaSkipConnectionForCausalLM'>
 Model dtype: torch.float32
+Model path: meta-llama/Llama-3.2-3B-Instruct
 
 Model type: <class 'src.models.modelling_llama_skip.LlamaSkipConnectionForCausalLM'>
 Model dtype: torch.float32
+Model path: meta-llama/Llama-3.2-3B-Instruct
 
 Model type: <class 'transformers.models.llama.modeling_llama.LlamaForCausalLM'>
 Model dtype: torch.float32
-
-SkipLLaMA Scripted MLP CPU Results:
-Average time: 0.010s
-Min time: 0.007s
-Max time: 0.032s
-Individual times: ['0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.007s', '0.008s', '0.008s', '0.017s', '0.009s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.024s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.008s', '0.007s', '0.032s', '0.032s', '0.028s', '0.031s', '0.027s', '0.028s', '0.028s', '0.024s', '0.028s', '0.020s', '0.028s', '0.008s', '0.029s', '0.013s', '0.013s', '0.013s']
-
-Standard LLaMA MLP CPU Results:
-Average time: 0.031s
-Min time: 0.021s
-Max time: 0.200s
-Individual times: ['0.188s', '0.058s', '0.088s', '0.192s', '0.053s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.024s', '0.023s', '0.024s', '0.023s', '0.023s', '0.021s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.024s', '0.024s', '0.023s', '0.023s', '0.022s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.024s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.022s', '0.023s', '0.023s', '0.023s', '0.024s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.022s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.024s', '0.023s', '0.023s', '0.024s', '0.023s', '0.024s', '0.023s', '0.022s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.024s', '0.023s', '0.023s', '0.022s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.024s', '0.023s', '0.023s', '0.023s', '0.023s', '0.024s', '0.023s', '0.023s', '0.022s', '0.023s', '0.023s', '0.023s', '0.024s', '0.024s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.024s', '0.023s', '0.024s', '0.023s', '0.023s', '0.021s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.024s', '0.023s', '0.023s', '0.023s', '0.023s', '0.023s', '0.022s', '0.023s', '0.024s', '0.023s', '0.191s', '0.189s', '0.044s', '0.043s', '0.044s', '0.043s', '0.043s', '0.200s', '0.104s', '0.041s', '0.040s', '0.041s', '0.038s']
+Model path: meta-llama/Llama-3.2-3B-Instruct
 
 SkipLLaMA Scripted CPU Results:
-Average time: 1.057s
-Min time: 0.672s
-Max time: 4.424s
-Individual times: ['0.692s', '0.715s', '0.672s', '0.680s', '0.674s', '0.673s', '0.684s', '0.673s', '0.682s', '4.424s']
+Average time: 1.095s
+Min time: 0.741s
+Max time: 4.726s
+Individual times: ['0.741s', '0.745s', '0.743s', '0.750s', '0.747s', '0.754s', '0.747s', '0.764s', '0.750s', '0.749s', '0.754s', '0.749s', '0.826s', '0.818s', '4.554s', '2.593s', '0.750s', '0.753s', '0.762s', '0.755s', '0.751s', '0.748s', '0.748s', '0.747s', '0.753s', '0.749s', '0.750s', '0.763s', '0.750s', '0.750s', '0.754s', '4.504s', '2.750s', '0.747s', '0.747s', '0.756s', '0.749s', '0.750s', '0.750s', '0.749s', '0.748s', '0.745s', '0.743s', '0.745s', '0.747s', '0.748s', '0.753s', '0.850s', '2.362s', '4.726s']
 
 Standard LLaMA CPU Results:
-Average time: 1.845s
-Min time: 1.371s
-Max time: 4.241s
-Individual times: ['3.207s', '1.375s', '1.374s', '1.384s', '1.371s', '1.376s', '1.373s', '1.372s', '1.374s', '4.241s']
+Average time: 1.824s
+Min time: 1.095s
+Max time: 6.964s
+Individual times: ['1.250s', '1.270s', '1.264s', '1.262s', '1.255s', '1.254s', '1.253s', '1.267s', '1.258s', '5.293s', '2.864s', '1.270s', '1.259s', '1.266s', '1.261s', '1.257s', '1.258s', '1.262s', '1.302s', '4.796s', '3.514s', '1.111s', '1.097s', '1.119s', '1.095s', '1.360s', '1.266s', '1.265s', '1.260s', '1.268s', '6.200s', '2.175s', '1.487s', '1.483s', '1.497s', '1.486s', '1.493s', '1.490s', '1.362s', '6.964s', '1.544s', '1.255s', '1.255s', '1.250s', '1.249s', '1.250s', '1.256s', '1.252s', '1.257s', '5.239s']
 
 CPU Speedups:
-Scripted vs Standard: 1.75x
+Scripted vs Standard: 1.67x

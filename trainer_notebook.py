@@ -1,8 +1,7 @@
 # %%
 import argparse
 import torch
-from contextlib import nullcontext
-
+import json
 from transformers import pipeline, AutoModelForCausalLM, AutoConfig, AutoTokenizer
 from transformers.models.llama.modeling_llama import LlamaMLP
 from src.models.modelling_llama_skip import LlamaSkipConnectionForCausalLM, LlamaSkipMLP, FastLoRAProjection
@@ -15,7 +14,11 @@ def parse_args():
     parser.add_argument('--device', type=str, choices=['cuda', 'cpu'], default='cpu',
                       help='Device to run inference on')
     parser.add_argument('--num_runs', type=int, default=50,
-                      help='Number of inference runs')
+                        help='Number of inference runs')
+    parser.add_argument('--verbose', type=bool, default=False,
+                        help='Verbose output')
+    parser.add_argument('--config', type=str, default='configs/llama_skip_causal_3b.json',
+                        help='Config file')
     return parser.parse_args()
 
 args = parse_args()
@@ -41,16 +44,15 @@ print(f"Using device: {device}")
 AutoConfig.register("llama-skip", LlamaSkipConnectionConfig)
 AutoModelForCausalLM.register(LlamaSkipConnectionConfig, LlamaSkipConnectionForCausalLM)
 
-# Load base model and tokenizer
-model_id = "vkkhare/llama-skip"
-checkpoint = "meta-llama/Llama-3.2-1B-Instruct"
+# Create custom config and model
+config = LlamaSkipConnectionConfig.from_json_file(args.config)
+checkpoint = config._name_or_path
+
 tokenizer = AutoTokenizer.from_pretrained(checkpoint, trust_remote_code=True)
 
 # Set padding token to be the same as EOS token
 tokenizer.pad_token = tokenizer.eos_token
 
-# Create custom config and model
-config = LlamaSkipConnectionConfig.from_pretrained(model_id)
 
 scripted_model = LlamaSkipConnectionForCausalLM.from_pretrained(
     checkpoint, 
@@ -111,10 +113,11 @@ def run_inference(model, input_ids, attention_mask, tokenizer, num_runs=args.num
     
     print(f"\nModel type: {type(model)}")
     print(f"Model dtype: {next(model.parameters()).dtype}")
+    print(f"Model path: {model.config._name_or_path}")
     
     times = []
     mlp_times = []  # Track MLP times separately
-    if device.type == 'cpu':
+    if device.type == 'cpu' and args.verbose:
         for module in model.modules():
             if isinstance(module, LlamaSkipMLP) or isinstance(module, LlamaMLP):
                 # Add forward hook to track MLP time
@@ -214,7 +217,7 @@ print_results = lambda name, times: (
     print(f"Individual times: {[f'{t:.3f}s' for t in times]}")
 )
 
-if device.type == 'cpu':
+if device.type == 'cpu' and args.verbose:
     print_results("SkipLLaMA Scripted MLP", skip_scripted_mlp_times)
     print_results("Standard LLaMA MLP", std_mlp_times)
 

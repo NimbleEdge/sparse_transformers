@@ -32,12 +32,13 @@ void compute_active_weights(
     const torch::Tensor& down_weight,
     const torch::Tensor& mask) {
     int64_t batch_size = mask.size(0);
-    WeightCache::getInstance()->init(batch_size, mask.device(), mask.scalar_type());
-    auto active_gate = gate_weight.narrow(0, 0, 1638).detach();
-    auto active_up = up_weight.narrow(0, 0, 1638).detach();
+    int64_t sparse_size = mask.size(1);
+    WeightCache::getInstance()->init(mask, gate_weight.size(1));
+    auto active_gate = gate_weight.narrow(0, 0, sparse_size).detach();
+    auto active_up = up_weight.narrow(0, 0, sparse_size).detach();
     // Concatenate gate and up weights
     auto concat_weights = torch::cat({active_gate, active_up}, 0);
-    auto active_down = down_weight.narrow(1, 0, 1638).detach();
+    auto active_down = down_weight.narrow(1, 0, sparse_size).detach();
     
     WeightCache::getInstance()->store(concat_weights, active_down);
 }
