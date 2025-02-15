@@ -1,5 +1,4 @@
 from transformers import PreTrainedModel
-from torch.nn import CrossEntropyLoss
 
 from transformers.modeling_outputs import (
     CausalLMOutputWithPast,
@@ -109,12 +108,14 @@ class LlamaSkipDecoderLayer(LlamaDecoderLayer):
         )
         self.layer_idx = layer_idx
         self.sparsity = config.sparsity
-        # Add mask for MLP weights - initialize on CPU first
+        
+        # Initialize mask with proper dtype
         self.register_buffer('mlp_mask', torch.zeros(
             config.intermediate_size,
             dtype=torch.bool
         ).contiguous())
-        self.mlp_mask[:int(config.intermediate_size * self.sparsity)] = True  # 10% sparsity
+        self.mlp_mask[:int(config.intermediate_size * self.sparsity)] = True
+        
         # Create LoRA projection
         self.lora_size = int(config.intermediate_size * 0.04)
         self.mlp_lora_proj = FastLoRAProjection(
@@ -139,7 +140,7 @@ class LlamaSkipDecoderLayer(LlamaDecoderLayer):
         output_attentions: Optional[bool] = False,
         use_cache: Optional[bool] = False,
         cache_position: Optional[torch.LongTensor] = None,
-        position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # necessary, but kept here for BC
+        position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,
         **kwargs: Unpack[FlashAttentionKwargs],
     ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
         residual = hidden_states

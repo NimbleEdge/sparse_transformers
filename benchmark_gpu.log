@@ -1,39 +1,83 @@
-Device set to use cuda
-Device set to use cuda
-Configuring for 8 CPU threads
-Using device: cuda
+Configuring for 64 CPU threads
+
+System Configuration:
+--------------------------------------------------
+OS: Linux 5.15.0-1079-azure
+CPU: x86_64
+Physical cores: 64
+Total cores: 64
+Max CPU frequency: 0MHz
+Current CPU frequency: 2468MHz
+RAM: Total=433.00GB, Available=422.33GB (2.5% used)
+
+GPU Configuration:
+--------------------------------------------------
+
+GPU 0: Tesla T4
+Compute capability: 7.5
+Total memory: 14.57GB
+Free memory: 14.37GB
+Multi processors: 40
+
+GPU 1: Tesla T4
+Compute capability: 7.5
+Total memory: 14.57GB
+Free memory: 14.46GB
+Multi processors: 40
+
+GPU 2: Tesla T4
+Compute capability: 7.5
+Total memory: 14.57GB
+Free memory: 14.46GB
+Multi processors: 40
+
+GPU 3: Tesla T4
+Compute capability: 7.5
+Total memory: 14.57GB
+Free memory: 14.46GB
+Multi processors: 40
+
+PyTorch version: 2.5.1
+CUDA version: 12.4
+--------------------------------------------------
+Number of available GPUs: 4
+Using devices: cuda, cuda:1, cuda:0
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  2.21it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  2.08it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  2.09it/s]
+Device set to use cuda:0
+Loading checkpoint shards:   0%|          | 0/2 [00:00<?, ?it/s]Loading checkpoint shards:  50%|█████     | 1/2 [00:00<00:00,  2.06it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  2.03it/s]Loading checkpoint shards: 100%|██████████| 2/2 [00:00<00:00,  2.03it/s]
+Device set to use cuda:1
 
 Running CUDA inference benchmarks...
 --------------------------------------------------
 Warming up models...
 
 Model type: <class 'transformers.models.llama.modeling_llama.LlamaForCausalLM'>
-Model dtype: torch.float16
-Model path: meta-llama/Llama-3.2-1B-Instruct
+Model device: cuda:1
+Model path: meta-llama/Llama-3.2-3B-Instruct
 
 Model type: <class 'src.models.modelling_llama_skip.LlamaSkipConnectionForCausalLM'>
-Model dtype: torch.float16
-Model path: meta-llama/Llama-3.2-1B-Instruct
+Model device: cuda:0
+Model path: meta-llama/Llama-3.2-3B-Instruct
 
 Model type: <class 'src.models.modelling_llama_skip.LlamaSkipConnectionForCausalLM'>
-Model dtype: torch.float16
-Model path: meta-llama/Llama-3.2-1B-Instruct
+Model device: cuda:0
+Model path: meta-llama/Llama-3.2-3B-Instruct
 
 Model type: <class 'transformers.models.llama.modeling_llama.LlamaForCausalLM'>
-Model dtype: torch.float16
-Model path: meta-llama/Llama-3.2-1B-Instruct
+Model device: cuda:1
+Model path: meta-llama/Llama-3.2-3B-Instruct
 
 SkipLLaMA Scripted CUDA Results:
-Average time: 0.021s
-Min time: 0.021s
-Max time: 0.021s
-Individual times: ['0.021s', '0.021s', '0.021s', '0.021s', '0.021s', '0.021s', '0.021s', '0.021s', '0.021s', '0.021s']
+Average time: 0.040s
+Min time: 0.039s
+Max time: 0.045s
+Individual times: ['0.040s', '0.045s', '0.040s', '0.039s', '0.039s', '0.039s', '0.039s', '0.039s', '0.041s', '0.040s', '0.039s', '0.043s', '0.039s', '0.039s', '0.039s', '0.039s', '0.039s', '0.039s', '0.039s', '0.039s', '0.039s', '0.040s', '0.040s', '0.040s', '0.039s', '0.039s', '0.039s', '0.039s', '0.039s', '0.040s', '0.042s', '0.040s', '0.039s', '0.039s', '0.039s', '0.039s', '0.039s', '0.039s', '0.039s', '0.039s', '0.039s', '0.040s', '0.039s', '0.039s', '0.039s', '0.039s', '0.039s', '0.040s', '0.039s', '0.039s']
 
 Standard LLaMA CUDA Results:
-Average time: 0.018s
-Min time: 0.017s
-Max time: 0.018s
-Individual times: ['0.018s', '0.018s', '0.018s', '0.018s', '0.018s', '0.018s', '0.018s', '0.018s', '0.017s', '0.018s']
+Average time: 0.034s
+Min time: 0.028s
+Max time: 0.044s
+Individual times: ['0.028s', '0.028s', '0.043s', '0.044s', '0.043s', '0.043s', '0.043s', '0.036s', '0.034s', '0.033s', '0.034s', '0.029s', '0.032s', '0.033s', '0.034s', '0.033s', '0.033s', '0.034s', '0.033s', '0.034s', '0.034s', '0.028s', '0.032s', '0.033s', '0.034s', '0.034s', '0.033s', '0.033s', '0.033s', '0.034s', '0.034s', '0.028s', '0.033s', '0.033s', '0.033s', '0.033s', '0.034s', '0.033s', '0.034s', '0.034s', '0.034s', '0.028s', '0.033s', '0.033s', '0.034s', '0.034s', '0.034s', '0.033s', '0.034s', '0.034s']
 
 CUDA Speedups:
 Scripted vs Standard: 0.85x

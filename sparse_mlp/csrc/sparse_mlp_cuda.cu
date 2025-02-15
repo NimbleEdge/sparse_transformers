@@ -287,11 +287,10 @@ torch::Tensor sparse_mlp_forward_cuda(
     torch::Tensor& down_proj_buffer,
     torch::Tensor& combined_proj_buffer,
     const std::string& activation_fn) {
-
     auto cache = WeightCache::getInstance();
     torch::Tensor concat_weight = cache->get_concat_weight();
     torch::Tensor active_down_weight = cache->get_active_down_weight();
-    
+
     const auto batch_size = input.size(0);
     const auto hidden_size = input.size(1);
     const auto intermediate_size = concat_weight.size(0) / 2;
@@ -326,7 +325,7 @@ torch::Tensor sparse_mlp_forward_cuda(
               batch_size);
     dim3 block2(threads_per_block, 1, 1);
     cudaStreamSynchronize(stream);
-
+    
     // Launch second kernel with timing buffer
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "sparse_mlp_output_cuda", [&] {
         sparse_mlp_output_cuda_kernel<scalar_t><<<grid2, block2, 0, stream>>>(
@@ -338,5 +337,6 @@ torch::Tensor sparse_mlp_forward_cuda(
             intermediate_size
         );
     });
+
     return down_proj_buffer;
 }
