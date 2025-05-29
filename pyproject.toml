@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "sparse_mlp"
 version = "0.0.1"
-description = "Sparse MLP operations with CUDA support"
+description = "Sparse MLP operations for transformers"
 authors = [
     {name = "Your Name"}
 ]

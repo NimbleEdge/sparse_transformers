@@ -102,7 +102,7 @@ class LlamaSkipMLP(nn.Module):
         return super().to(*args, **kwargs)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return sparse_mlp_forward(\
+        return sparse_mlp_forward(
             x.detach(), 
             self.weight_cache.get_concat_weight(),
             self.weight_cache.get_active_down_weight(),
