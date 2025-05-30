@@ -2,12 +2,14 @@
 
 ## Overview
 
-The project implements the Sparse multiplication and fuses up/down projections in the MLP layers through low rank neural networks for weight activations. Work is based on the original contextual sparsity paper [ et al] and Apple’s LLM in a Flash [ et al].
+The project implements sparse multiplication and fuses up/down projections in the MLP layers through low rank weight activations. 
+Work is based on [Deja Vu](https://arxiv.org/abs/2310.17157) and Apple’s [LLM in a Flash](https://arxiv.org/abs/2401.02486).
 
-- [x] Torch CPU kernels for fp16, fp32
-- [x] Differential weight caching  and selection for dynamic sparsity
-- [ ] CUDA kernels for Sparse Inferencing
-- [ ] CPU kernels for int8, iint32, int64
+### Benefits
+- **1.6-1.8x overall gain in TTFT and TPS** (4-5x gain in MLP Inference)
+- **26.4%** reduction in memory usage
+- **6.7×** faster index selection and replacement for weight caching
+
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -32,8 +34,12 @@ The project implements the Sparse multiplication and fuses up/down projections i
 
 **Keywords:** Large Language Models, Sparse Inference, Differential Weight Caching
 
-## Current Performance Benchmarks
-Since MLP layers account from 30% of total compute, a 5x gain in inference speed for MLP generates 1.6-1.8x overall speed gains.
+## Performance Benchmarks
+State of Implementation:
+- [x] Torch CPU kernels for fp16, fp32
+- [x] Differential weight caching  and selection for dynamic sparsity
+- [ ] CUDA kernels for Sparse Inferencing
+- [ ] CPU kernels for int8, int32, int64
 
 ### CPU Performance 
 ```
@@ -48,7 +54,7 @@ Sparse LLaMA 3.2 3B vs LLaMA 3.2 3B (on HuggingFace Implementation):
 ### GPU Performance
 
 ```
-Sparse LLaMA 3B vs Standard LLaMA 3B CUDA Results:
+Sparse LLaMA 3.2 3B vs Standard LLaMA 3.2 3B CUDA Results (on HuggingFace Implementation):
 
 - Average time (Sparse): 0.021s
 - Average time (Standard): 0.018s
@@ -76,9 +82,8 @@ python run_benchmark.py \
 
 ## Implementation Details
 
-
 ### Paired Replacement with Differential Caching
-_sparse_mlp/csrc/weight_cache.h_
+_sparse_transformers/csrc/weight_cache.h_
 
 The weight cache is a class that manages the active weights for the sparse MLP. It differentially updates the MLP tensor memory pool for the next token based on the predicted sparsity mask.
 
@@ -91,12 +96,12 @@ class WeightCache {
 ```
 
 **Performance Impact:**
-- **6.7× faster cache updates**: 16.89ms → 8.36ms
+- **6.7× faster cache updates**: 29.89ms (naive `index_select`) → 4.46ms (paired replacement)
 - **Better cache locality**: Row major for Up Projection and Column major for Down Projection Matrices
 - **Contiguous Memory Access**: Single memcpy for cache updates 
 
 ### Sparse MLP Inference
-_sparse_mlp/csrc/sparse_mlp_op.cpp_
+_sparse_transformers/csrc/sparse_mlp_op.cpp_
 
 ```python
 sparse_mlp_forward(
@@ -110,14 +115,14 @@ sparse_mlp_forward(
 ```
 
 **Performance Impact:**
-- **5× faster MLP inference**: 30.1ms → 6.02ms
+- **5× faster CPU MLP inference**: 30.1ms → 6.02ms
 - OpenMP parallelization with `torch::at::parallel_for`
 - Bounded memory usage with weight cache memory pool
 
 ## Project Structure
 
 ```
-├── sparse_mlp/                    # C++ extension module
+├── sparse_transformers/                    # C++ extension module
 │   ├── csrc/
 │   │   ├── sparse_mlp_op.cpp     # Main CPU/CUDA dispatcher
 │   │   ├── sparse_mlp_cuda.cu    # CUDA kernels
@@ -138,22 +143,21 @@ sparse_mlp_forward(
 ### Build C++ Extensions
 ```bash
 # Clone repository
-git clone https://github.com/nimbleedge/sparse_mlp.git
-cd sparse_mlp
+git clone https://github.com/nimbleedge/sparse_transformers.git
+cd sparse_transformers
 
 # Install in editable mode (builds C++ extensions automatically)
 pip install -r requirements.txt
 pip install -e .
 
 # Verify installation
-python -c "import sparse_mlp; print('✅ Installation successful!')"
+python -c "import sparse_transformers; print('✅ Installation successful!')"
 ```
 
 ## Contributing
-
-We welcome contributions! Areas of particular interest:
-1. **Additional models**: Extend beyond LLaMA to other architectures
-2. **Quantization**: Combine with INT8/FP16 optimizations
-3. **Attention Kernels**: Implement Sparse Attention Kernels
+We welcome contributions! Areas of particular interest are:
+- **Additional models**: Extend beyond LLaMA to other architectures
+- **Quantization**: Combine with INT8/FP16 optimizations
+- **Attention Kernels**: Implement Sparse Attention Kernels
 
 

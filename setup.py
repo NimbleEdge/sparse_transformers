@@ -103,10 +103,10 @@ if torch.cuda.is_available():
 ext_modules = []
 if torch.cuda.is_available():
     extension = CUDAExtension(
-        name='sparse_mlp',
+        name='sparse_transformers',
         sources=[
-            'sparse_mlp/csrc/sparse_mlp_op.cpp',
-            'sparse_mlp/csrc/sparse_mlp_cuda.cu'
+            'sparse_transformers/csrc/sparse_mlp_op.cpp',
+            'sparse_transformers/csrc/sparse_mlp_cuda.cu'
         ],
         include_dirs=base_include_dirs,
         extra_compile_args={
@@ -120,8 +120,8 @@ if torch.cuda.is_available():
     )
 else:
     extension = CppExtension(
-        name='sparse_mlp',
-        sources=['sparse_mlp/csrc/sparse_mlp_op.cpp'],
+        name='sparse_transformers',
+        sources=['sparse_transformers/csrc/sparse_mlp_op.cpp'],
         extra_compile_args=cpu_compile_args,
         extra_link_args=extra_link_args,
         library_dirs=[str(build_dir / 'lib')],
@@ -150,7 +150,7 @@ class CustomBuildExtension(BuildExtension):
         super().build_extensions()
 
 setup(
-    name='sparse_mlp',
+    name='sparse_transformers',
     packages=find_packages(),
     ext_modules=ext_modules,
     cmdclass={

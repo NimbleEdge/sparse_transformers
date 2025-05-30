@@ -3,13 +3,13 @@ requires = ["setuptools>=64", "wheel", "torch"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sparse_mlp"
+name = "sparse_transformers"
 version = "0.0.1"
-description = "Sparse MLP operations for transformers"
+description = "Sparse Inference for transformers"
 authors = [
-    {name = "Your Name"}
+    {name = "NimbleEdge"}
 ]
 requires-python = ">=3.7"
 
 [tool.setuptools]
-packages = ["sparse_mlp"] 
+packages = ["sparse_transformers"] 

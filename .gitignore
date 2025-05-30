@@ -3,6 +3,7 @@
 *.py[cod]
 *$py.class
 *.so
+llama.cpp/
 .Python
 build/
 develop-eggs/

@@ -27,7 +27,7 @@ import torch.utils.cpp_extension
 
 # Import C++ extensions
 import torch
-from sparse_mlp import (
+from sparse_transformers import (
     sparse_mlp_forward,
     WeightCache
 )
