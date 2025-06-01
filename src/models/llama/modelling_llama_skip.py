@@ -1,8 +1,8 @@
 from transformers import PreTrainedModel
-
+from dataclasses import dataclass
 from transformers.modeling_outputs import (
     CausalLMOutputWithPast,
-    BaseModelOutputWithPast,
+    ModelOutput
 )
 from transformers.utils import (
     add_start_docstrings_to_model_forward,
@@ -12,7 +12,7 @@ from transformers.utils import (
 )
 from transformers.models.llama.modeling_llama import(
      LlamaRMSNorm, LlamaRotaryEmbedding, LlamaDecoderLayer,FlashAttentionKwargs, KwargsForCausalLM,
-     LLAMA_INPUTS_DOCSTRING, _CONFIG_FOR_DOC, LLAMA_START_DOCSTRING
+     LLAMA_INPUTS_DOCSTRING, _CONFIG_FOR_DOC, LLAMA_START_DOCSTRING, LlamaMLP
 )
 from typing import List, Optional, Tuple, Union
 from transformers.modeling_attn_mask_utils import AttentionMaskConverter
@@ -29,12 +29,133 @@ import torch.utils.cpp_extension
 import torch
 from sparse_transformers import (
     sparse_mlp_forward,
-    WeightCache
+    WeightCache,
+    approx_topk_threshold
 )
 
 from src.models.llama.configuration_llama_skip import LlamaSkipConnectionConfig
 
 logger = logging.get_logger(__name__)
+
+@dataclass
+class BaseModelOutputWithPastAndPredictorLoss(ModelOutput):
+    loss: Optional[torch.FloatTensor] = None
+    last_hidden_state: Optional[torch.FloatTensor] = None
+    past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
+    hidden_states: Optional[Tuple[torch.FloatTensor, ...]] = None
+    attentions: Optional[Tuple[torch.FloatTensor, ...]] = None    
+
+
+class PredictorTrainingLoss(nn.Module):
+    """Loss function for training sparsity predictors based on ground truth activations."""
+    
+    def __init__(self, loss_type: str = "bce", temperature: float = 1.0, alpha: float = 1.0, 
+                 confidence_penalty: float = 0.1, focal_gamma: float = 2.0):
+        super().__init__()
+        self.loss_type = loss_type
+        self.temperature = temperature
+        self.alpha = alpha
+        self.confidence_penalty = confidence_penalty  # Weight for confidence regularization
+        self.focal_gamma = focal_gamma  # Gamma parameter for focal loss
+        
+    def forward(self, predicted_scores: torch.Tensor, ground_truth_activations: torch.Tensor, 
+                sparsity_ratio: float) -> torch.Tensor:
+        """
+        Compute predictor training loss with enhanced binary classification.
+        
+        Args:
+            predicted_scores: [batch_size, intermediate_size] - predictor output scores
+            ground_truth_activations: [batch_size, intermediate_size] - actual activations from standard LLaMA
+            sparsity_ratio: Target sparsity ratio
+        """
+        batch_size, intermediate_size = predicted_scores.shape
+        
+        # Create ground truth binary mask based on top-k activations
+        k = max(1, int(intermediate_size * sparsity_ratio))
+        
+        # Get top-k indices for each batch item
+        _, top_k_indices = torch.topk(torch.abs(ground_truth_activations), k, dim=-1)
+        
+        # Create binary ground truth mask
+        ground_truth_mask = torch.zeros_like(ground_truth_activations, dtype=torch.bool)
+        ground_truth_mask.scatter_(1, top_k_indices, True)
+        ground_truth_target = ground_truth_mask.float()  # Convert to float for loss computation
+        
+        # Apply temperature scaling and sigmoid to get probabilities
+        predicted_probs = torch.sigmoid(predicted_scores / self.temperature)
+        
+        if self.loss_type == "bce":
+            # Enhanced Binary Cross-Entropy with confidence penalty
+            bce_loss = F.binary_cross_entropy(predicted_probs, ground_truth_target, reduction='none')
+            
+            # Confidence penalty: penalize predictions close to 0.5 (uncertain)
+            # This encourages predictions to be close to 0 or 1
+            confidence_loss = self.confidence_penalty * torch.mean(
+                4 * predicted_probs * (1 - predicted_probs)  # Maximum at 0.5, minimum at 0 and 1
+            )
+            
+            loss = torch.mean(bce_loss) + confidence_loss
+            
+        elif self.loss_type == "focal":
+            # Focal loss for hard example mining and confident predictions
+            ce_loss = F.binary_cross_entropy(predicted_probs, ground_truth_target, reduction='none')
+            
+            # Calculate focal weight: (1 - p_t)^gamma where p_t is the prob of correct class
+            p_t = predicted_probs * ground_truth_target + (1 - predicted_probs) * (1 - ground_truth_target)
+            focal_weight = (1 - p_t) ** self.focal_gamma
+            
+            focal_loss = focal_weight * ce_loss
+            
+            # Add confidence penalty
+            confidence_loss = self.confidence_penalty * torch.mean(
+                4 * predicted_probs * (1 - predicted_probs)
+            )
+            
+            loss = torch.mean(focal_loss) + confidence_loss
+            
+        elif self.loss_type == "ranking":
+            # Enhanced ranking loss with confidence penalty
+            active_scores = predicted_scores[ground_truth_mask]
+            inactive_scores = predicted_scores[~ground_truth_mask]
+            
+            if len(active_scores) > 0 and len(inactive_scores) > 0:
+                # Sample pairs for efficiency
+                n_pairs = min(1000, len(active_scores) * len(inactive_scores))
+                active_sample = active_scores[torch.randint(0, len(active_scores), (n_pairs,))]
+                inactive_sample = inactive_scores[torch.randint(0, len(inactive_scores), (n_pairs,))]
+                
+                # Margin ranking loss with larger margin for clearer separation
+                ranking_loss = F.margin_ranking_loss(
+                    active_sample, inactive_sample, 
+                    torch.ones_like(active_sample), margin=2.0  # Increased margin
+                )
+                
+                # Add confidence penalty on probabilities
+                confidence_loss = self.confidence_penalty * torch.mean(
+                    4 * predicted_probs * (1 - predicted_probs)
+                )
+                
+                loss = ranking_loss + confidence_loss
+            else:
+                # Fallback to BCE if no active/inactive samples
+                loss = F.binary_cross_entropy(predicted_probs, ground_truth_target)
+            
+        elif self.loss_type == "mse":
+            # MSE loss with normalized activations and confidence penalty
+            normalized_activations = torch.abs(ground_truth_activations) / (torch.abs(ground_truth_activations).max(dim=-1, keepdim=True)[0] + 1e-8)
+            mse_loss = F.mse_loss(predicted_probs, normalized_activations)
+            
+            # Add confidence penalty
+            confidence_loss = self.confidence_penalty * torch.mean(
+                4 * predicted_probs * (1 - predicted_probs)
+            )
+            
+            loss = mse_loss + confidence_loss
+            
+        else:
+            raise ValueError(f"Unknown loss type: {self.loss_type}")
+            
+        return self.alpha * loss
 
 class FastLoRAProjection(nn.Module):
     def __init__(self, hidden_size, intermediate_size, lora_size):
@@ -66,13 +187,22 @@ class FastLoRAProjection(nn.Module):
    
     def forward(self, x):
         batch_size = x.size(0)
-        self._resize_buffers(batch_size, x.dtype)
-        torch.mm(x, self.down.weight.t(), out=self.intermediate)
-        torch.mm(self.intermediate, self.up.weight.t(), out=self.output)
-        return self.output
+        
+        # Check if gradients are required (training mode)
+        if x.requires_grad or any(p.requires_grad for p in self.parameters()):
+            # Use regular matrix multiplication for gradient computation
+            intermediate = torch.mm(x, self.down.weight.t())
+            output = torch.mm(intermediate, self.up.weight.t())
+            return output
+        else:
+            # Use optimized in-place operations for inference
+            self._resize_buffers(batch_size, x.dtype)
+            torch.mm(x, self.down.weight.t(), out=self.intermediate)
+            torch.mm(self.intermediate, self.up.weight.t(), out=self.output)
+            return self.output
 
 class LlamaSkipMLP(nn.Module):
-    def __init__(self, hidden_size: int, intermediate_size: int, sparsity: float, bias: bool = False, use_optimized_cache: bool = True):
+    def __init__(self, hidden_size: int, intermediate_size: int, sparsity: float, bias: bool = False):
         super().__init__()
         self.gate_proj = nn.Linear(hidden_size, intermediate_size, bias=bias)
         self.up_proj = nn.Linear(hidden_size, intermediate_size, bias=bias)
@@ -80,6 +210,7 @@ class LlamaSkipMLP(nn.Module):
         self.sparsity = sparsity
         self.init_mask = torch.ones(intermediate_size, dtype=torch.bool, device=self.gate_proj.weight.device)
         self.init_mask[int(intermediate_size * sparsity):] = 0
+        
         # Create and initialize weight cache (always use optimized version)
         self.weight_cache = WeightCache(   
             self.init_mask,
@@ -114,15 +245,6 @@ class LlamaSkipMLP(nn.Module):
 class LlamaSkipDecoderLayer(LlamaDecoderLayer):
     def __init__(self, config: LlamaSkipConnectionConfig, layer_idx: int):
         super().__init__(config, layer_idx)
-        # Use optimized cache by default (can be configured via config if needed)
-        use_optimized_cache = getattr(config, 'use_optimized_weight_cache', True)
-        self.mlp = LlamaSkipMLP(
-            config.hidden_size,
-            config.intermediate_size,
-            config.sparsity,
-            config.mlp_bias,
-            use_optimized_cache=use_optimized_cache
-        )
         self.layer_idx = layer_idx
         self.sparsity = config.sparsity
         
@@ -132,7 +254,7 @@ class LlamaSkipDecoderLayer(LlamaDecoderLayer):
             dtype=torch.bool
         ).contiguous())
 
-        # Create LoRA projection
+        # Create LoRA projection for sparsity prediction
         self.lora_size = int(config.intermediate_size * 0.04)
         self.mlp_lora_proj = FastLoRAProjection(
             config.hidden_size, 
@@ -140,8 +262,54 @@ class LlamaSkipDecoderLayer(LlamaDecoderLayer):
             self.lora_size
         )
         
-        # Simply use the weight cache from the MLP
-        self.weight_cache = self.mlp.weight_cache
+        # Check if this is a training configuration
+        self.is_training_config = getattr(config, 'training', False)
+        
+        # Only initialize predictor training components if explicitly enabled
+        if self.is_training_config:
+            # Standard MLP for ground truth collection during training
+            self.mlp = LlamaMLP(config)
+            
+            # Loss function for predictor training
+            self.predictor_loss_fn = PredictorTrainingLoss(
+                loss_type=getattr(config, 'predictor_loss_type', 'bce'),
+                temperature=getattr(config, 'predictor_temperature', 1.0),
+                alpha=getattr(config, 'predictor_loss_alpha', 1.0),
+                confidence_penalty=getattr(config, 'predictor_confidence_penalty', 0.1),
+                focal_gamma=getattr(config, 'predictor_focal_gamma', 2.0)
+            )
+        else:
+            self.mlp = LlamaSkipMLP(
+                config.hidden_size,
+                config.intermediate_size,
+                config.sparsity,
+                config.mlp_bias,
+            )
+            # Simply use the weight cache from the MLP
+            self.weight_cache = self.mlp.weight_cache
+
+    def get_ground_truth_activations(self, hidden_states: torch.Tensor) -> torch.Tensor:            
+        # Compute standard MLP intermediate activations
+        gate_proj = self.mlp.gate_proj(hidden_states)
+        
+        # Apply SiLU activation to gate projection
+        gate_activated = F.silu(gate_proj)
+        
+        return gate_activated
+
+    def compute_predictor_loss(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        """Compute loss for training the sparsity predictor."""
+        # Get predictor scores
+        hidden_states_reshaped = hidden_states.view(-1, hidden_states.shape[-1])
+        predicted_scores = self.mlp_lora_proj(hidden_states_reshaped)
+        
+        # Get ground truth activations
+        ground_truth_activations = self.get_ground_truth_activations(hidden_states_reshaped)
+        
+        # Compute predictor loss
+        loss = self.predictor_loss_fn(predicted_scores, ground_truth_activations, self.sparsity)
+        
+        return loss
 
     def forward(
         self,
@@ -159,20 +327,23 @@ class LlamaSkipDecoderLayer(LlamaDecoderLayer):
         hidden_states = self.input_layernorm(hidden_states)
         # Reshape hidden states for batch processing
         hidden_states_reshaped = hidden_states.view(-1, hidden_states.shape[-1])
-        
-        # 1. LoRA projection to get importance scores
-        lora_proj_scores = self.mlp_lora_proj(hidden_states_reshaped)
-        
-        # 2. Compute statistical threshold: values beyond 2 standard deviations
-        batch_mean = torch.mean(lora_proj_scores, dim=1, keepdim=True)
-        batch_std = torch.std(lora_proj_scores, dim=1, keepdim=True)
-        threshold = batch_mean + 2.0 * batch_std
-        
-        # 3. Binary mask creation
-        binary_mask = (lora_proj_scores > threshold).bool()
-        
-        # Normalize 2D mask to 1D by taking union across batch dimension
-        self.weight_cache.update_active_weights(binary_mask.any(dim=0))  # [batch_size, intermediate_size] → [intermediate_size]
+
+        if not self.training:  # Use PyTorch's built-in training flag
+                # 1. LoRA projection to get importance scores
+            lora_proj_scores = self.mlp_lora_proj(hidden_states_reshaped)
+
+            # 2. Ultra-fast sparsity-based threshold using C++ Count-Min Sketch operator
+            batch_size, intermediate_size = lora_proj_scores.shape
+            k = max(1, int(self.sparsity * intermediate_size))  # Number of neurons to activate
+            
+            # Use optimized C++ Count-Min Sketch operator for threshold computation
+            threshold = approx_topk_threshold(lora_proj_scores, k)
+            
+            # 3. Binary mask creation
+            binary_mask = (lora_proj_scores >= threshold).bool()
+            
+            # Normalize 2D mask to 1D by taking union across batch dimension
+            self.weight_cache.update_active_weights(binary_mask.any(dim=0))  # [batch_size, intermediate_size] → [intermediate_size]
           
         # Self Attention
         hidden_states, self_attn_weights = self.self_attn(
@@ -191,16 +362,20 @@ class LlamaSkipDecoderLayer(LlamaDecoderLayer):
         # Fully Connected
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        # Pass through MLP
-        hidden_states = self.mlp(hidden_states.view(-1, hidden_states.shape[-1]))
+        hidden_states = self.mlp(hidden_states_reshaped)
+
+        if self.training:
+            predictor_loss = self.compute_predictor_loss(hidden_states_reshaped)
+        else:
+            predictor_loss = None
+        
         hidden_states = hidden_states.view(residual.shape)
         hidden_states = residual + hidden_states
         outputs = (hidden_states,)
         if output_attentions:
             outputs += (self_attn_weights,)
 
-        return outputs
-
+        return outputs, predictor_loss
 
 @add_start_docstrings(
     "The bare LLaMA Model outputting raw hidden-states without any specific head on top.",
@@ -254,6 +429,51 @@ class LlamaSkipConnectionModel(LlamaSkipPreTrainedModel):
     def set_input_embeddings(self, value):
         self.embed_tokens = value
 
+    def get_predictor_parameters(self):
+        """Get parameters of all predictor networks for optimization."""
+        predictor_params = []
+        for layer in self.layers:
+            predictor_params.extend(layer.mlp_lora_proj.parameters())
+        return predictor_params
+    
+    def freeze_non_predictor_parameters(self):
+        """Freeze all parameters except predictor networks."""
+        # Freeze main model parameters
+        for param in self.embed_tokens.parameters():
+            param.requires_grad = False
+        for param in self.norm.parameters():
+            param.requires_grad = False
+        for param in self.rotary_emb.parameters():
+            param.requires_grad = False
+            
+        # Freeze layer parameters except predictors
+        for layer in self.layers:
+            # Freeze attention parameters
+            for param in layer.self_attn.parameters():
+                param.requires_grad = False
+            for param in layer.input_layernorm.parameters():
+                param.requires_grad = False
+            for param in layer.post_attention_layernorm.parameters():
+                param.requires_grad = False
+                
+            # Freeze standard MLP parameters (used for ground truth) - only if it exists
+            if hasattr(layer, 'standard_mlp'):
+                for param in layer.standard_mlp.parameters():
+                    param.requires_grad = False
+                
+            # Freeze sparse MLP parameters
+            for param in layer.mlp.parameters():
+                param.requires_grad = False
+                
+            # Keep predictor parameters trainable
+            for param in layer.mlp_lora_proj.parameters():
+                param.requires_grad = True
+
+    def unfreeze_all_parameters(self):
+        """Unfreeze all model parameters."""
+        for param in self.parameters():
+            param.requires_grad = True
+
     @add_start_docstrings_to_model_forward(LLAMA_INPUTS_DOCSTRING)
     def forward(
         self,
@@ -265,16 +485,14 @@ class LlamaSkipConnectionModel(LlamaSkipPreTrainedModel):
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
-        return_dict: Optional[bool] = None,
         cache_position: Optional[torch.LongTensor] = None,
         **flash_attn_kwargs: Unpack[FlashAttentionKwargs],
-    ) -> Union[Tuple, BaseModelOutputWithPast]:
+    ) -> Union[Tuple, BaseModelOutputWithPastAndPredictorLoss]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         use_cache = use_cache if use_cache is not None else self.config.use_cache
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         if (input_ids is None) ^ (inputs_embeds is not None):
             raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
@@ -312,13 +530,14 @@ class LlamaSkipConnectionModel(LlamaSkipPreTrainedModel):
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
+        all_predictor_losses = []  # Collect predictor losses
 
         for decoder_layer in self.layers[: self.config.num_hidden_layers]:
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
             if self.gradient_checkpointing and self.training:
-                layer_outputs = self._gradient_checkpointing_func(
+                layer_outputs, predictor_loss = self._gradient_checkpointing_func(
                     decoder_layer.__call__,
                     hidden_states,
                     causal_mask,
@@ -331,7 +550,7 @@ class LlamaSkipConnectionModel(LlamaSkipPreTrainedModel):
                 )
             else:
 
-                layer_outputs = decoder_layer(
+                layer_outputs, predictor_loss = decoder_layer(
                     hidden_states,
                     attention_mask=causal_mask,
                     position_ids=position_ids,
@@ -347,6 +566,10 @@ class LlamaSkipConnectionModel(LlamaSkipPreTrainedModel):
 
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
+            
+            # Collect predictor loss if available
+            if predictor_loss is not None:
+                all_predictor_losses.append(predictor_loss)
 
         hidden_states = self.norm(hidden_states)
 
@@ -354,14 +577,18 @@ class LlamaSkipConnectionModel(LlamaSkipPreTrainedModel):
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
         
+        # Compute total predictor loss
+        total_predictor_loss = None
+        if all_predictor_losses:
+            total_predictor_loss = torch.stack(all_predictor_losses).mean()
 
-        output = BaseModelOutputWithPast(
+        return BaseModelOutputWithPastAndPredictorLoss(
+            loss=total_predictor_loss,
             last_hidden_state=hidden_states,
             past_key_values=past_key_values if use_cache else None,
             hidden_states=all_hidden_states,
             attentions=all_self_attns,
         )
-        return output if return_dict else output.to_tuple()
 
     def _update_causal_mask(
         self,
@@ -493,7 +720,10 @@ class LlamaSkipConnectionForCausalLM(LlamaSkipPreTrainedModel, GenerationMixin):
         "model.layers.*.mlp_lora_proj.intermediate",
         "model.layers.*.mlp_lora_proj.output", 
         "model.layers.*.mlp_lora_proj.up.weight",
-        "model.layers.*.mlp_mask"
+        "model.layers.*.mlp_mask",
+        "model.layers.*.standard_mlp.gate_proj.weight",
+        "model.layers.*.standard_mlp.up_proj.weight",
+        "model.layers.*.standard_mlp.down_proj.weight"
     ]
 
     def __init__(self, config):
@@ -517,11 +747,27 @@ class LlamaSkipConnectionForCausalLM(LlamaSkipPreTrainedModel, GenerationMixin):
     def set_output_embeddings(self, new_embeddings):
         self.lm_head = new_embeddings
 
-    def set_decoder(self, decoder):
-        self.model = decoder
-
     def get_decoder(self):
         return self.model
+    
+    def get_predictor_parameters(self):
+        """Get parameters of all predictor networks for optimization."""
+        return self.model.get_predictor_parameters()
+
+    def freeze_non_predictor_parameters(self):
+        """Freeze all parameters except predictor networks."""
+        # Freeze LM head
+        for param in self.lm_head.parameters():
+            param.requires_grad = False
+        
+        # Freeze model parameters except predictors
+        self.model.freeze_non_predictor_parameters()
+    
+    def unfreeze_all_parameters(self):
+        """Unfreeze all model parameters."""
+        self.model.unfreeze_all_parameters()
+        for param in self.lm_head.parameters():
+            param.requires_grad = True
 
     @add_start_docstrings_to_model_forward(LLAMA_INPUTS_DOCSTRING)
     @replace_return_docstrings(output_type=CausalLMOutputWithPast, config_class=_CONFIG_FOR_DOC)
@@ -587,25 +833,44 @@ class LlamaSkipConnectionForCausalLM(LlamaSkipPreTrainedModel, GenerationMixin):
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict,
             cache_position=cache_position,
             **kwargs,
         )
 
-        hidden_states = outputs[0]
+        hidden_states = outputs.last_hidden_state
         # Only compute necessary logits, and do not upcast them to float if we are not computing the loss
         logits = self.lm_head(hidden_states[:, -num_logits_to_keep:, :])
 
         loss = None
+        total_loss = None        
         if labels is not None:
+            # Compute language modeling loss
             loss = self.loss_function(logits=logits, labels=labels, vocab_size=self.config.vocab_size, **kwargs)
+            
+            # Combine with predictor loss if in training mode
+            if outputs.loss is not None:
+                # Weight the predictor loss (can be configured)
+                predictor_weight = getattr(self.config, 'predictor_loss_weight', 0.1)
+                total_loss = loss + predictor_weight * outputs.loss
+            else:
+                total_loss = loss
+        elif outputs.loss is not None:
+            # If we're in training mode with predictor loss but no labels, use predictor loss as main loss
+            total_loss = outputs.loss
 
         if not return_dict:
             output = (logits,) + outputs[1:]
-            return (loss,) + output if loss is not None else output
+            if total_loss is not None:
+                return (total_loss,) + output
+            elif loss is not None:
+                return (loss,) + output
+            elif outputs.loss is not None:
+                return (outputs.loss,) + output
+            else:
+                return output
 
         return CausalLMOutputWithPast(
-            loss=loss,
+            loss=total_loss,
             logits=logits,
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,

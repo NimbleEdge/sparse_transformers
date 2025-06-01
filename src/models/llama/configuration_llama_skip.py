@@ -8,8 +8,20 @@ from optimum.exporters.onnx.config import TextDecoderWithPositionIdsOnnxConfig
 class LlamaSkipConnectionConfig(LlamaConfig):
     model_type = "llama-skip"
 
-    def __init__(self, sparsity : float, **kwargs):
+    def __init__(self, 
+                 sparsity: float,
+                 predictor_loss_type: str = "bce",
+                 predictor_temperature: float = 1.0,
+                 predictor_loss_alpha: float = 1.0,
+                 predictor_loss_weight: float = 0.1,
+                 use_optimized_weight_cache: bool = True,
+                 **kwargs):
         self._sparsity = sparsity
+        self.predictor_loss_type = predictor_loss_type
+        self.predictor_temperature = predictor_temperature
+        self.predictor_loss_alpha = predictor_loss_alpha
+        self.predictor_loss_weight = predictor_loss_weight
+        self.use_optimized_weight_cache = use_optimized_weight_cache
         super().__init__(**kwargs)
     
     @property

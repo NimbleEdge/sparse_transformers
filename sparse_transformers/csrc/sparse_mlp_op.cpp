@@ -24,6 +24,7 @@ namespace py = pybind11;
 
 // Add custom headers
 #include "weight_cache.h"
+#include "approx_topk.h"
 
 // Forward declarations of CPU/CUDA implementations
 torch::Tensor sparse_mlp_forward_cpu(
@@ -127,6 +128,9 @@ TORCH_LIBRARY(sparse_mlp, m)
         .def("get_concat_weight", &WeightCache::get_concat_weight)
         .def("get_active_down_weight", &WeightCache::get_active_down_weight);
 
-    // Then register the operators that use the custom class
+    // Register sparse MLP operator
     m.def("forward", sparse_mlp_forward);
+
+    // Register Count-Min Sketch approximate top-k threshold operator
+    m.def("approx_topk_threshold", approx_topk_threshold);
 }

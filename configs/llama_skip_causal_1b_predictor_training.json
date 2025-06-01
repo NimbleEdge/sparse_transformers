@@ -1,6 +1,15 @@
 {
   "_name_or_path": "meta-llama/Llama-3.2-1B-Instruct",
   "sparsity": 0.3,
+  "training": true,
+  "predictor_loss_type": "bce",
+  "predictor_temperature": 1.0,
+  "predictor_loss_alpha": 1.0,
+  "predictor_loss_weight": 0.1,
+  "predictor_confidence_penalty": 0.15,
+  "predictor_focal_gamma": 2.0,
+  "use_optimized_weight_cache": true,
+  "return_dict": true,
   "architectures": [
     "LlamaSkipConnectionForCausalLM"
   ],
@@ -38,4 +47,4 @@
   "transformers_version": "4.44.2",
   "use_cache": true,
   "vocab_size": 128256
-}
+} 

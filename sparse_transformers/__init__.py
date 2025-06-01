@@ -12,15 +12,17 @@ torch.set_num_threads(num_threads)
 torch.set_num_interop_threads(num_threads)
 os.environ['MAX_JOBS'] = str(num_threads)
 
-# torch.ops.load_library("./build/lib/sparse_mlp.so")
-torch.classes.load_library("./build/lib/sparse_mlp.so")
+torch.classes.load_library("./build/lib/sparse_transformers.so")
 
 sparse_mlp_forward = torch.ops.sparse_mlp.forward
 WeightCache = torch.classes.sparse_mlp.WeightCache
 
+# Export Count-Min Sketch approximate top-k function from sparse_mlp library
+approx_topk_threshold = torch.ops.sparse_mlp.approx_topk_threshold
 
 # Re-export for API compatibility
 __all__ = [
     'sparse_mlp_forward', 
-    'WeightCache'
+    'WeightCache',
+    'approx_topk_threshold'
 ]
