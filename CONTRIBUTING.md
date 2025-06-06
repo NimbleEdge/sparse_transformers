@@ -17,7 +17,7 @@ We follow a fork and pull request workflow for all contributions. Here's how it 
    - Click the "Fork" button on the top right of the repository page
    - Clone your fork locally:
      ```bash
-     git clone https://github.com/YOUR-USERNAME/Sparse Transformers.git
+     git clone https://github.com/YOUR-USERNAME/sparse_transformers.git
      cd Sparse Transformers
      ```
 
