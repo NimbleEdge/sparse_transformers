@@ -160,6 +160,8 @@ We welcome contributions from the community! Areas of particular interest are:
 - **Quantization**: Combine with INT8/FP16 optimizations
 - **Attention Kernels**: Implement Sparse Attention Kernels
 
+Please read our [Contributing Guidelines](CONTRIBUTING.md) to get started.
+
 ## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
