@@ -147,8 +147,11 @@ git clone https://github.com/nimbleedge/sparse_transformers.git
 cd sparse_transformers
 
 # Install in editable mode (builds C++ extensions automatically)
+conda create -n sparse_transformers python=3.10
+conda activate sparse_transformers
+conda install pytorch==2.5.0 torchvision==0.20.0 torchaudio==2.5.0 pytorch-cuda=12.4 -c pytorch -c nvidia
 pip install -r requirements.txt
-pip install -e .
+python setup.py build_ext --inplace
 
 # Verify installation
 python -c "import sparse_transformers; print('✅ Installation successful!')"

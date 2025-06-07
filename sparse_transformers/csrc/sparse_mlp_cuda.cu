@@ -288,8 +288,24 @@ torch::Tensor sparse_mlp_forward_cuda(
     torch::Tensor& down_proj_buffer,
     torch::Tensor& combined_proj_buffer,
     const std::string& activation_fn) {
-    const auto batch_size = input.size(0);
-    const auto hidden_size = input.size(1);
+    
+    // Store original input shape for reshaping output later
+    auto original_shape = input.sizes().vec();
+    bool needs_reshape = input.dim() > 2;
+    
+    // Flatten input if it has more than 2 dimensions
+    torch::Tensor input_2d;
+    if (needs_reshape) {
+        // Flatten all dimensions except the last one (hidden dimension)
+        auto hidden_size = original_shape.back();
+        auto total_batch_size = input.numel() / hidden_size;
+        input_2d = input.view({total_batch_size, hidden_size});
+    } else {
+        input_2d = input;
+    }
+    
+    const auto batch_size = input_2d.size(0);
+    const auto hidden_size = input_2d.size(1);
     const auto intermediate_size = concat_weight.size(0) / 2;
 
     const int threads_per_block = 256;
@@ -304,9 +320,9 @@ torch::Tensor sparse_mlp_forward_cuda(
     cudaStream_t stream = at::cuda::getCurrentCUDAStream(input.device().index());
 
     // Launch first kernel with timing buffer
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "sparse_mlp_combined_cuda", [&] {
+    AT_DISPATCH_FLOATING_TYPES_AND_HALF(input_2d.scalar_type(), "sparse_mlp_combined_cuda", [&] {
         sparse_mlp_combined_cuda_kernel<scalar_t><<<grid, block, 0, stream>>>(
-            input.data_ptr<scalar_t>(),
+            input_2d.data_ptr<scalar_t>(),
             concat_weight.data_ptr<scalar_t>(),
             combined_proj_buffer.data_ptr<scalar_t>(),
             batch_size,
@@ -324,7 +340,7 @@ torch::Tensor sparse_mlp_forward_cuda(
     cudaStreamSynchronize(stream);
     
     // Launch second kernel with timing buffer
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(input.scalar_type(), "sparse_mlp_output_cuda", [&] {
+    AT_DISPATCH_FLOATING_TYPES_AND_HALF(input_2d.scalar_type(), "sparse_mlp_output_cuda", [&] {
         sparse_mlp_output_cuda_kernel<scalar_t><<<grid2, block2, 0, stream>>>(
             combined_proj_buffer.data_ptr<scalar_t>(),
             active_down_weight.data_ptr<scalar_t>(),
@@ -335,5 +351,10 @@ torch::Tensor sparse_mlp_forward_cuda(
         );
     });
     
-    return down_proj_buffer;
+    // Reshape output back to original shape if input was multi-dimensional
+    if (needs_reshape) {
+        return down_proj_buffer.view(original_shape);
+    } else {
+        return down_proj_buffer;
+    }
 }

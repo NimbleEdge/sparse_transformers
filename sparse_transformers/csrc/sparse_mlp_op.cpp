@@ -79,9 +79,26 @@ torch::Tensor sparse_mlp_forward_cpu(
     torch::Tensor &combined_proj_buffer,
     const std::string &activation_fn)
 {
+    // Store original input shape for reshaping output later
+    auto original_shape = input.sizes().vec();
+    bool needs_reshape = input.dim() > 2;
 
-    const auto batch_size = input.size(0);
-    const auto hidden_size = input.size(1);
+    // Flatten input if it has more than 2 dimensions
+    torch::Tensor input_2d;
+    if (needs_reshape)
+    {
+        // Flatten all dimensions except the last one (hidden dimension)
+        auto hidden_size = original_shape.back();
+        auto total_batch_size = input.numel() / hidden_size;
+        input_2d = input.view({total_batch_size, hidden_size});
+    }
+    else
+    {
+        input_2d = input;
+    }
+
+    const auto batch_size = input_2d.size(0);
+    const auto hidden_size = input_2d.size(1);
 
     // Ensure output buffer is correctly sized
     if (down_proj_buffer.size(0) != batch_size)
@@ -98,7 +115,7 @@ torch::Tensor sparse_mlp_forward_cpu(
                      {
         for (int64_t batch_idx = start; batch_idx < end; batch_idx++) {
             int64_t gate_size = concat_weight.size(0) / 2;
-            auto x_batch = input[batch_idx].unsqueeze(0).detach();
+            auto x_batch = input_2d[batch_idx].unsqueeze(0).detach();
             
             // Single matmul for both gate and up projections
             auto proj_view = combined_proj_buffer[batch_idx].unsqueeze(0).narrow(1, 0, concat_weight.size(0));
@@ -115,7 +132,16 @@ torch::Tensor sparse_mlp_forward_cpu(
             // Final projection
             down_proj_buffer[batch_idx] = torch::matmul(gate_proj, active_down_weight.t())[0];
         } });
-    return down_proj_buffer;
+
+    // Reshape output back to original shape if input was multi-dimensional
+    if (needs_reshape)
+    {
+        return down_proj_buffer.view(original_shape);
+    }
+    else
+    {
+        return down_proj_buffer;
+    }
 }
 
 // Register TorchScript custom classes and operators

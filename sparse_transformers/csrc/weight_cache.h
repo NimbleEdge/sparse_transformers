@@ -60,6 +60,7 @@ private:
 
     // Max expected active indices (dynamic based on intermediate_size)
     size_t max_active_indices = 0;
+    size_t min_active_indices = 0;
 
     // Cache-aligned memory allocation
     static void *aligned_alloc_wrapper(size_t size)
@@ -113,12 +114,7 @@ private:
         const size_t num_active = active_indices.size();
 
         if (num_active == 0)
-        {
-            auto options = torch::TensorOptions().device(current_device).dtype(dtype);
-            active_weights_cache = torch::empty({0, hidden_dim}, options);
-            active_downs_cache = torch::empty({0, hidden_dim}, options);
-            return;
-        }
+            throw std::runtime_error("No active weights");
 
         // Create gate tensor directly from buffer
         auto gate_tensor = torch::from_blob(active_gate_buffer.get(),
@@ -161,6 +157,7 @@ public:
         hidden_dim = hidden_size;
         sparse_dim = gate_weight.size(0);
         max_active_indices = init_mask.sum().item<int64_t>();
+        min_active_indices = max_active_indices / 2;
         gate_row_size = gate_weight.size(1);
         up_row_size = up_weight.size(1);
         down_row_size = hidden_dim; // After transpose: [intermediate_size, hidden_size]
@@ -221,7 +218,6 @@ public:
 
         // Compute diff with normalization handled internally
         auto diff = compute_mask_diff(current_mask, mask);
-
         // Early exit if no changes - avoid all processing work!
         if (diff.added_indices.empty() && diff.removed_indices.empty())
         {
@@ -300,6 +296,13 @@ public:
             auto it = index_to_position.find(removed_idx);
             if (it != index_to_position.end())
             {
+                // Check if removing this index would leave us with too few active indices
+                if (active_indices.size() <= min_active_indices)
+                {
+                    // Skip this removal to maintain minimum cache size
+                    break;
+                }
+
                 size_t pos_to_remove = it->second;
                 size_t last_pos = active_indices.size() - 1;
 

@@ -9,9 +9,7 @@ import threading
 import statistics
 from typing import List, Dict, Tuple, Optional, Union
 import numpy as np
-import subprocess
-import json
-import tempfile
+from accelerate import init_empty_weights, infer_auto_device_map
 
 import torch
 from transformers import pipeline, AutoModelForCausalLM, AutoConfig, AutoTokenizer
@@ -248,31 +246,54 @@ def get_diverse_test_prompts() -> List[Dict[str, Union[str, int]]]:
             "max_tokens": 50,
             "description": "Short simple prompt"
         },
-        {
-            "prompt": "Give me a detailed recipe for making a burrito including all ingredients and their quantities.",
-            "max_tokens": 200,
-            "description": "Medium recipe prompt"
-        },
-        {
-            "prompt": "Explain the concept of machine learning, its applications in modern technology, and how it differs from traditional programming approaches. Include examples.",
-            "max_tokens": 300,
-            "description": "Long technical explanation"
-        },
-        {
-            "prompt": "Write a short story about a robot discovering emotions.",
-            "max_tokens": 400,
-            "description": "Creative writing prompt"
-        },
-        {
-            "prompt": "Analyze the economic implications of artificial intelligence on job markets, considering both positive and negative effects, and suggest potential policy responses.",
-            "max_tokens": 500,
-            "description": "Complex analytical prompt"
-        }
+        # {
+        #     "prompt": "Give me a detailed recipe for making a burrito including all ingredients and their quantities.",
+        #     "max_tokens": 200,
+        #     "description": "Medium recipe prompt"
+        # },
+        # {
+        #     "prompt": "Explain the concept of machine learning, its applications in modern technology, and how it differs from traditional programming approaches. Include examples.",
+        #     "max_tokens": 300,
+        #     "description": "Long technical explanation"
+        # },
+        # {
+        #     "prompt": "Write a short story about a robot discovering emotions.",
+        #     "max_tokens": 400,
+        #     "description": "Creative writing prompt"
+        # },
+        # {
+        #     "prompt": "Analyze the economic implications of artificial intelligence on job markets, considering both positive and negative effects, and suggest potential policy responses.",
+        #     "max_tokens": 500,
+        #     "description": "Complex analytical prompt"
+        # }
     ]
 
 
-def reset_model_state(model: AutoModelForCausalLM):
+def reset_model_state(model: AutoModelForCausalLM, model_device: torch.device = torch.device('cpu')):
     """Reset model state between independent sequences."""
+
+    # Clear GPU cache if using CUDA
+    if next(model.parameters()).device.type == 'cuda':
+        torch.cuda.empty_cache()
+    
+    gc.collect()
+
+    # Check if model has any meta tensors
+    # has_meta_tensors = any(
+    #     (hasattr(p, 'is_meta') and p.is_meta) or 
+    #     (hasattr(p, 'device') and p.device.type == 'meta')
+    #     for p in model.parameters()
+    # )
+    
+    # if has_meta_tensors:
+    #     # Use to_empty() for models with meta tensors
+    #     print("Detected meta tensors, using to_empty() for device transfer...")
+    #     model = model.to_empty(device=model_device)
+    #     model.tie_weights()
+    # else:
+    #     # Use standard to() for normal models
+    #     model = model.to(model_device)
+
     # Clear past key values cache
     if hasattr(model, 'past_key_values'):
         model.past_key_values = None
@@ -283,14 +304,9 @@ def reset_model_state(model: AutoModelForCausalLM):
     
     # Disable caching for fresh inference
     model.config.use_cache = False
-
-    # Clear GPU cache if using CUDA
-    if next(model.parameters()).device.type == 'cuda':
-        torch.cuda.empty_cache()
-    
-    # Trigger garbage collection
-    gc.collect()
-
+    model.eval()
+    if hasattr(model, 'reset_cache'):
+        model.reset_cache()
 
 def benchmark_single_prompt(
     model: AutoModelForCausalLM,
@@ -303,12 +319,11 @@ def benchmark_single_prompt(
     """Benchmark a single prompt for TTFT and TPS metrics."""
     
     # Reset model state for independent sequence
-    reset_model_state(model)
+    reset_model_state(model, device)
     
     # Tokenize input
     inputs = tokenizer(prompt, return_tensors='pt', padding=True, truncation=True, max_length=512)
     input_ids = inputs['input_ids'].to(device)
-    attention_mask = inputs['attention_mask'].to(device)
     
     input_tokens = input_ids.shape[1]
     
@@ -332,29 +347,16 @@ def benchmark_single_prompt(
     generated_tokens = []
     first_token_time = None
     
-    model.eval()
     with torch.no_grad():
         current_input_ids = input_ids
-        current_attention_mask = attention_mask
         
         for step in range(max_new_tokens):
             # Forward pass
             if device.type == 'cuda':
                 with torch.amp.autocast(device_type='cuda'):
-                    outputs = model(current_input_ids, attention_mask=current_attention_mask, return_dict=True)
+                    outputs = model(current_input_ids)
             else:
-                outputs = model(current_input_ids, attention_mask=current_attention_mask, return_dict=True)
-            
-            # Get next token
-            logits = outputs.logits[:, -1, :]
-            
-            # Apply temperature sampling
-            if temperature > 0:
-                logits = logits / temperature
-                probs = torch.softmax(logits, dim=-1)
-                next_token = torch.multinomial(probs, num_samples=1)
-            else:
-                next_token = torch.argmax(logits, dim=-1, keepdim=True)
+                outputs = model(current_input_ids)
             
             # Record first token time
             if step == 0:
@@ -363,6 +365,15 @@ def benchmark_single_prompt(
                     torch.cuda.synchronize()
                 else:
                     first_token_time = time.perf_counter() - start_time
+            # Get next token
+            logits = outputs.logits[:, -1, :]
+            # Apply temperature sampling
+            if temperature > 0:
+                logits = logits / temperature
+                probs = torch.softmax(logits, dim=-1)
+                next_token = torch.multinomial(probs, num_samples=1)
+            else:
+                next_token = torch.argmax(logits, dim=-1, keepdim=True)
             
             generated_tokens.append(next_token.item())
             
@@ -372,10 +383,6 @@ def benchmark_single_prompt(
             
             # Update input for next iteration
             current_input_ids = torch.cat([current_input_ids, next_token], dim=-1)
-            current_attention_mask = torch.cat([
-                current_attention_mask, 
-                torch.ones(1, 1, device=device, dtype=current_attention_mask.dtype)
-            ], dim=-1)
     
     # Record end time
     if device.type == 'cuda':
@@ -501,13 +508,7 @@ def run_inference(
     """Run comprehensive inference benchmark."""
     
     print(f"\n=== Benchmarking {model_name} ===")
-    
-    # Move model to device with appropriate precision
-    model = model.to(model_device)
-    if model_device.type == 'cuda':
-        model = model.to(torch.float16)
-    else:
-        model = model.to(torch.float32)
+    reset_model_state(model, model_device)
     
     print(f"Model device: {model_device}")
     print(f"Model dtype: {next(model.parameters()).dtype}")
@@ -516,17 +517,14 @@ def run_inference(
     print("Warming up model...")
     warmup_prompt = test_prompts[0]
     for _ in range(2):
-        try:
-            benchmark_single_prompt(
-                model=model,
-                tokenizer=tokenizer,
-                prompt=warmup_prompt['prompt'],
-                max_new_tokens=min(50, warmup_prompt['max_tokens']),
-                device=model_device,
-                temperature=0.7
-            )
-        except Exception as e:
-            print(f"Warmup failed: {e}")
+        benchmark_single_prompt(
+            model=model,
+            tokenizer=tokenizer,
+            prompt=warmup_prompt['prompt'],
+            max_new_tokens=min(50, warmup_prompt['max_tokens']),
+            device=model_device,
+            temperature=0.7
+        )
     
     # Main benchmark
     results = benchmark_language_model(
@@ -582,257 +580,6 @@ def print_comprehensive_results(results: Dict, model_name: str):
             print(f"   Max Utilization: {results['max_p90_gpu_utilization']:.1f}%")
 
 
-def check_llamacpp_available(binary_path: str) -> bool:
-    """Check if llama.cpp binary is available."""
-    try:
-        result = subprocess.run([binary_path, '--version'], 
-                              capture_output=True, text=True, timeout=5)
-        return result.returncode == 0
-    except (subprocess.TimeoutExpired, FileNotFoundError):
-        return False
-
-
-def convert_model_to_gguf(model_path: str, output_path: str) -> bool:
-    """Convert HuggingFace model to GGUF format using llama.cpp convert script."""
-    try:
-        # Look for convert script in the local llama.cpp installation
-        convert_script = "llama.cpp/convert_hf_to_gguf.py"
-        if not os.path.exists(convert_script):
-            # Try without underscore (older versions)
-            convert_script = "llama.cpp/convert-hf-to-gguf.py"
-            if not os.path.exists(convert_script):
-                # Try the home directory as fallback
-                convert_script = os.path.expanduser("~/llama.cpp/convert_hf_to_gguf.py")
-                if not os.path.exists(convert_script):
-                    print(f"Convert script not found. Tried:")
-                    print(f"  - llama.cpp/convert_hf_to_gguf.py")
-                    print(f"  - llama.cpp/convert-hf-to-gguf.py")
-                    print(f"  - ~/llama.cpp/convert_hf_to_gguf.py")
-                    return False
-        
-        cmd = [
-            "python", convert_script,
-            model_path,
-            "--outfile", output_path,
-            "--outtype", "f16"  # Use FP16 for fair comparison
-        ]
-        
-        print(f"Converting model to GGUF format...")
-        print(f"Using script: {convert_script}")
-        print(f"Command: {' '.join(cmd)}")
-        
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        
-        if result.returncode != 0:
-            print(f"Conversion failed: {result.stderr}")
-            return False
-            
-        print(f"✓ Model converted successfully to: {output_path}")
-        return True
-    except Exception as e:
-        print(f"Error converting model: {e}")
-        return False
-
-
-def benchmark_llamacpp_single_prompt(
-    model_path: str,
-    prompt: str,
-    max_tokens: int,
-    binary_path: str = "llama-cli",
-    temperature: float = 0.7,
-    device: str = "cpu"
-) -> Dict:
-    """Benchmark a single prompt using llama.cpp."""
-    
-    # Prepare command
-    cmd = [
-        binary_path,
-        "-m", model_path,
-        "-p", prompt,
-        "-n", str(max_tokens),
-        "--temp", str(temperature),
-        "--seed", "42",  # Fixed seed for reproducibility
-        "--log-disable",  # Disable logging for cleaner output
-        "--simple-io",  # Simple input/output mode
-        "-ngl", "99" if device == "cuda" else "0",  # GPU layers
-        "--no-display-prompt"  # Don't display the prompt in output
-    ]
-    
-    # Add timing flag if available in the llama.cpp version
-    cmd.extend(["--timings"])
-    
-    # Run llama.cpp
-    start_time = time.perf_counter()
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=300  # 5 minute timeout
-        )
-        total_time = time.perf_counter() - start_time
-        
-        if result.returncode != 0:
-            raise RuntimeError(f"llama.cpp failed: {result.stderr}")
-        
-        # Parse output and timing information
-        output_text = result.stdout
-        stderr_lines = result.stderr.strip().split('\n')
-        
-        # Extract timing metrics from stderr
-        metrics = {
-            'total_time_seconds': total_time,
-            'output_text': output_text
-        }
-        
-        # Parse timing information from llama.cpp output
-        for line in stderr_lines:
-            if "prompt eval time" in line:
-                # Extract prompt evaluation time
-                parts = line.split()
-                if "ms" in line:
-                    time_idx = parts.index("ms") - 1
-                    prompt_time_ms = float(parts[time_idx])
-                    metrics['prompt_eval_time_seconds'] = prompt_time_ms / 1000
-                    
-            elif "eval time" in line and "prompt eval" not in line:
-                # Extract generation time
-                parts = line.split()
-                if "ms" in line:
-                    time_idx = parts.index("ms") - 1
-                    gen_time_ms = float(parts[time_idx])
-                    metrics['generation_time_seconds'] = gen_time_ms / 1000
-                    
-            elif "total time" in line:
-                parts = line.split()
-                if "ms" in line:
-                    time_idx = parts.index("ms") - 1
-                    total_ms = float(parts[time_idx])
-                    metrics['reported_total_time_seconds'] = total_ms / 1000
-                    
-            elif "speed" in line or "tok/s" in line:
-                # Extract tokens per second
-                parts = line.split()
-                for i, part in enumerate(parts):
-                    if "tok/s" in part or (i > 0 and parts[i-1] == "tok/s"):
-                        try:
-                            tps = float(parts[i-2] if "tok/s" in part else part)
-                            if "prompt" in line:
-                                metrics['prompt_tokens_per_second'] = tps
-                            else:
-                                metrics['output_tokens_per_second'] = tps
-                        except (ValueError, IndexError):
-                            pass
-        
-        # Count tokens (approximate)
-        output_tokens = len(output_text.split())  # Rough approximation
-        input_tokens = len(prompt.split())  # Rough approximation
-        
-        metrics.update({
-            'input_tokens': input_tokens,
-            'output_tokens': output_tokens,
-            'total_tokens': input_tokens + output_tokens
-        })
-        
-        # Calculate TTFT if we have the metrics
-        if 'prompt_eval_time_seconds' in metrics:
-            metrics['time_to_first_token_seconds'] = metrics['prompt_eval_time_seconds']
-        
-        # Calculate tokens per second if not provided
-        if 'output_tokens_per_second' not in metrics and 'generation_time_seconds' in metrics:
-            if metrics['generation_time_seconds'] > 0:
-                metrics['output_tokens_per_second'] = output_tokens / metrics['generation_time_seconds']
-        
-        if 'tokens_per_second' not in metrics:
-            metrics['tokens_per_second'] = metrics['total_tokens'] / total_time
-        
-        return metrics
-        
-    except subprocess.TimeoutExpired:
-        return {
-            'error': 'Timeout',
-            'total_time_seconds': 300,
-            'input_tokens': len(prompt.split()),
-            'output_tokens': 0,
-            'total_tokens': len(prompt.split())
-        }
-    except Exception as e:
-        return {
-            'error': str(e),
-            'total_time_seconds': time.perf_counter() - start_time,
-            'input_tokens': len(prompt.split()),
-            'output_tokens': 0,
-            'total_tokens': len(prompt.split())
-        }
-
-
-def benchmark_llamacpp_model(
-    model_path: str,
-    test_prompts: List[Dict],
-    binary_path: str = "llama-cli",
-    device: str = "cpu",
-    temperature: float = 0.7
-) -> Dict:
-    """Benchmark llama.cpp model across multiple prompts."""
-    
-    all_results = []
-    
-    print(f"\nRunning llama.cpp benchmark on {len(test_prompts)} prompts...")
-    print(f"Model: {model_path}")
-    print(f"Device: {device}")
-    
-    for i, prompt_config in enumerate(test_prompts):
-        print(f"\nPrompt {i+1}/{len(test_prompts)}: {prompt_config['description']}")
-        print(f"Max tokens: {prompt_config['max_tokens']}")
-        
-        try:
-            result = benchmark_llamacpp_single_prompt(
-                model_path=model_path,
-                prompt=prompt_config['prompt'],
-                max_tokens=prompt_config['max_tokens'],
-                binary_path=binary_path,
-                temperature=temperature,
-                device=device
-            )
-            
-            if 'error' not in result:
-                result['prompt_description'] = prompt_config['description']
-                all_results.append(result)
-                
-                # Print individual results
-                if 'time_to_first_token_seconds' in result:
-                    print(f"TTFT: {result['time_to_first_token_seconds']:.3f}s")
-                if 'output_tokens_per_second' in result:
-                    print(f"Output TPS: {result['output_tokens_per_second']:.1f}")
-                print(f"Total time: {result['total_time_seconds']:.3f}s")
-            else:
-                print(f"Error: {result['error']}")
-                
-        except Exception as e:
-            print(f"Error benchmarking prompt {i+1}: {str(e)}")
-            continue
-    
-    if not all_results:
-        return {}
-    
-    # Aggregate results
-    metrics = ['time_to_first_token_seconds', 'tokens_per_second', 'output_tokens_per_second', 'total_time_seconds']
-    
-    aggregated = {}
-    
-    for metric in metrics:
-        values = [r[metric] for r in all_results if metric in r and r[metric] > 0]
-        if values:
-            aggregated[f'p50_{metric}'] = statistics.median(values)
-            aggregated[f'p90_{metric}'] = np.percentile(values, 90)
-            aggregated[f'mean_{metric}'] = statistics.mean(values)
-    
-    aggregated['total_prompts'] = len(all_results)
-    aggregated['individual_results'] = all_results
-    
-    return aggregated
-
-
 def main():
     """Main function to run the comprehensive benchmark."""
     args = parse_args()
@@ -874,48 +621,17 @@ def main():
         verbose=args.verbose
     )
 
-    # Run standard model benchmark
-    if args.compare_with_llamacpp:
-        # Check if llama.cpp is available
-        if not check_llamacpp_available(args.llamacpp_binary):
-            print(f"\n❌ llama.cpp binary '{args.llamacpp_binary}' not found!")
-            print("Please install llama.cpp and ensure the binary is in your PATH")
-            print("Or specify the full path using --llamacpp_binary")
-            return
-        
-        # Determine GGUF model path
-        if args.llamacpp_model_path:
-            gguf_model_path = args.llamacpp_model_path
-        else:
-            # Try to convert the model
-            gguf_model_path = os.path.join(tempfile.gettempdir(), "model.gguf")
-            print(f"\n📦 Converting model to GGUF format...")
-            if not convert_model_to_gguf(checkpoint, gguf_model_path):
-                print("❌ Failed to convert model to GGUF format")
-                print("Please provide a pre-converted GGUF model using --llamacpp_model_path")
-                return
-        
-        # Run llama.cpp benchmark
-        standard_results = benchmark_llamacpp_model(
-            model_path=gguf_model_path,
-            test_prompts=test_prompts,
-            binary_path=args.llamacpp_binary,
-            device=args.device,
-            temperature=0.7
-        )
-        standard_name = "Standard LLaMA (llama.cpp)"
-    else:
-        # Use HuggingFace implementation
-        standard_model = AutoModelForCausalLM.from_pretrained(checkpoint)
-        standard_results = run_inference(
-            model=standard_model,
-            tokenizer=tokenizer,
-            test_prompts=test_prompts,
-            model_device=standard_device,
-            model_name="Standard LLaMA (HuggingFace)",
-            verbose=args.verbose
-        )
-        standard_name = "Standard LLaMA (HuggingFace)"
+    # Run standard model benchmark using HuggingFace implementation
+    standard_model = AutoModelForCausalLM.from_pretrained(checkpoint)
+    standard_results = run_inference(
+        model=standard_model,
+        tokenizer=tokenizer,
+        test_prompts=test_prompts,
+        model_device=standard_device,
+        model_name="Standard LLaMA (HuggingFace)",
+        verbose=args.verbose
+    )
+    standard_name = "Standard LLaMA (HuggingFace)"
 
     # Print results
     print_comprehensive_results(skip_results, "SkipLLaMA")
