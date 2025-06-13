@@ -164,6 +164,10 @@ python setup.py build_ext --inplace
 python -c "import sparse_transformers; print('✅ Installation successful!')"
 ```
 
+## Community engagement
+We welcome any feedback or suggestions - please join our
+[Discord](https://discord.gg/CxzDDffR) to engage with the community.
+
 ## Contributing
 We welcome contributions from the community! Areas of particular interest are:
 - **Additional models**: Extend beyond LLaMA to other architectures
