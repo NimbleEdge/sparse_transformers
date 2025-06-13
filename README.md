@@ -1,3 +1,5 @@
+[![Join us on Discord](https://img.shields.io/discord/<server_id>?label=Discord&logo=discord&style=flat)](https://discord.gg/CxzDDffR)
+
 # Fused Sparse C++ Kernels for Transformers
 
 ## Overview
