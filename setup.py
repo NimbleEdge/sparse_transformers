@@ -175,6 +175,9 @@ if torch.cuda.is_available() and os.path.exists(cuda_source):
         raise RuntimeError("CUDA headers not found")
 else:
     print("Building CPU-only extension...")
+    cuda_include_dirs = get_cuda_include_dirs()
+    if cuda_include_dirs:
+        base_include_dirs.extend(cuda_include_dirs)
     extension = CppExtension(
         name='sparse_transformers.sparse_transformers',
         sources=[cpp_source],
