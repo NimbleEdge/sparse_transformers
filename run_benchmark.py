@@ -8,13 +8,10 @@ import numpy as np
 
 import torch
 from transformers import AutoModelForCausalLM, AutoConfig, AutoTokenizer
-from src.models.llama.modelling_llama_skip import LlamaSkipConnectionForCausalLM
-from src.models.llama.configuration_llama_skip import LlamaSkipConnectionConfig
-from src.models.qwen2.modelling_qwen_skip import Qwen2SkipConnectionForCausalLM
-from src.models.qwen2.configuration_qwen_skip import Qwen2SkipConnectionConfig
 from src.modeling_utils import FastLoRAProjection
 from src.utilities.cuda_utils import GPUMonitor, setup_cuda_debugging
 from src.utilities.sys_utils import print_system_info
+import src.models   # adds models to registry
 
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
@@ -395,15 +392,12 @@ def main():
     # Print system info after device setup
     print_system_info(args)
 
-    # Register custom models
-    AutoConfig.register("qwen2-skip", Qwen2SkipConnectionConfig)
-    AutoModelForCausalLM.register(Qwen2SkipConnectionConfig, Qwen2SkipConnectionForCausalLM)
-
     # Load models and tokenizer
-    config = Qwen2SkipConnectionConfig.from_json_file(args.config)
+    config = AutoConfig.from_pretrained(args.config)
     checkpoint = config._name_or_path
     tokenizer = AutoTokenizer.from_pretrained(checkpoint, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.eos_token
+    model_name = checkpoint.split("-")[0].capitalize()
 
     # Get test prompts
     test_prompts = get_diverse_test_prompts()
@@ -412,7 +406,7 @@ def main():
     print(f"📝 Test prompts: {[p['description'] for p in test_prompts]}")
 
     # Always run SkipLLaMA benchmark with HuggingFace
-    skip_model = Qwen2SkipConnectionForCausalLM.from_pretrained(checkpoint, config=config)
+    skip_model = AutoModelForCausalLM.from_pretrained(checkpoint, config=config)
     for module in skip_model.modules():
         if any(hasattr(p, 'is_meta') and p.is_meta for p in module.parameters()) and isinstance(module, FastLoRAProjection):
             module = module.to_empty(device="cpu")
@@ -421,29 +415,31 @@ def main():
                 torch.nn.init.zeros_(module.up.weight)  # Initialize up projection to zeros for stable training
     skip_model.tie_weights()
     
+    skip_name = "Skip-%s" % model_name
     skip_results = run_inference(
         model=skip_model,
         tokenizer=tokenizer,
         test_prompts=test_prompts,
         model_device=skip_device,
-        model_name="SkipQwen",
+        model_name=skip_name,
         verbose=args.verbose
     )
 
     # Run standard model benchmark using HuggingFace implementation
     standard_model = AutoModelForCausalLM.from_pretrained(checkpoint)
+    standard_name = "Standard %s (HuggingFace)" % model_name
     standard_results = run_inference(
         model=standard_model,
         tokenizer=tokenizer,
         test_prompts=test_prompts,
         model_device=standard_device,
-        model_name="Standard Qwen (HuggingFace)",
+        model_name=standard_name,
         verbose=args.verbose
     )
-    standard_name = "Standard Qwen (HuggingFace)"
+    
 
     # Print results
-    print_comprehensive_results(skip_results, "SkipQwen")
+    print_comprehensive_results(skip_results, skip_name)
     print_comprehensive_results(standard_results, standard_name)
     
     # Calculate speedups

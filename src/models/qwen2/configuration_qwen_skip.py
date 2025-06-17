@@ -1,11 +1,12 @@
-from transformers import Qwen2Config
+from transformers import Qwen2Config,  PretrainedConfig
 import os
-from typing import Union
+from typing import Union, Any
 
 
 
 class Qwen2SkipConnectionConfig(Qwen2Config):
     model_type = "qwen2-skip"
+    has_no_defaults_at_init: bool = True
 
     def __init__(self, 
                  sparsity: float,
@@ -46,3 +47,9 @@ class Qwen2SkipConnectionConfig(Qwen2Config):
         """
         config_dict = cls._dict_from_json_file(json_file)
         return cls(**config_dict)
+
+    @classmethod
+    def from_dict(cls, config_dict: dict[str, Any], **kwargs) -> "Qwen2SkipConnectionConfig":
+        if "name_or_path" in kwargs:
+            del kwargs["name_or_path"]
+        return super().from_dict(config_dict, **kwargs)
