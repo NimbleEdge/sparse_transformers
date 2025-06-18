@@ -8,6 +8,7 @@ def build_skip_config(base_config_class: type[PretrainedConfig], model_type_name
     class SkipConnectionConfig(base_config_class):
         model_type: str = model_type_name
         has_no_defaults_at_init: bool = True
+
         def __init__(self, 
                     sparsity: float,
                     predictor_loss_type: str = "bce",
@@ -50,7 +51,7 @@ def build_skip_config(base_config_class: type[PretrainedConfig], model_type_name
 
         @classmethod
         def from_dict(cls, config_dict: dict[str, Any], **kwargs):
-            if "name_or_path" in kwargs and "name_or_path" in config_dict:
+            if "name_or_path" in kwargs and ("name_or_path" in config_dict or "_name_or_path" in config_dict):
                 del kwargs["name_or_path"]
             return super().from_dict(config_dict, **kwargs)
     return SkipConnectionConfig
