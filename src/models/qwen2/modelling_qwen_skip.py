@@ -45,60 +45,6 @@ from src.modeling_skip import SkipMLP, SkipDecoderLayer, build_skip_connection_m
 logger = logging.get_logger(__name__)
 
 
-class Qwen2SkipMLP(nn.Module):
-    def __init__(self, hidden_size: int, intermediate_size: int, sparsity: float):
-        super().__init__()
-        self.gate_proj = nn.Linear(hidden_size, intermediate_size, bias=False)
-        self.up_proj = nn.Linear(hidden_size, intermediate_size, bias=False)
-        self.down_proj = nn.Linear(intermediate_size, hidden_size, bias=False)
-        self.sparsity = sparsity
-        self.hidden_size = hidden_size
-        self.intermediate_size = intermediate_size
-        
-        # Initialize mask but defer WeightCache creation until post_init
-        self.init_mask = torch.ones(intermediate_size, dtype=torch.bool)
-        self.init_mask[int(intermediate_size * sparsity):] = 0
-        
-        self.weight_cache = None
-
-        # Register buffers - start with reasonable size and ensure they can be resized
-        self.register_buffer('down_proj_buffer', torch.zeros(1, hidden_size, requires_grad=False))
-        self.register_buffer('combined_proj_buffer', torch.zeros(1, 2 * int(intermediate_size * sparsity), requires_grad=False))
-
-    def initialize_weight_cache(self):
-        """Tie weights after weights are loaded (called from post_init)."""
-        if self.weight_cache is None:
-            # Create and initialize weight cache
-            self.weight_cache = WeightCache(   
-                self.init_mask,
-                self.hidden_size,
-                self.gate_proj.weight,
-                self.up_proj.weight, 
-                self.down_proj.weight
-            )
-
-    def to(self, *args, **kwargs):
-        # Move buffers to same device as model when .to() is called
-        result = super().to(*args, **kwargs)
-        device = args[0] if args else kwargs.get('device')
-        if device:
-            self.down_proj_buffer = self.down_proj_buffer.to(device)
-            self.combined_proj_buffer = self.combined_proj_buffer.to(device)
-            if hasattr(self, 'init_mask'):
-                self.init_mask = self.init_mask.to(device)
-        return result
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = sparse_mlp_forward(
-            x.detach(), 
-            self.weight_cache.get_concat_weight(),
-            self.weight_cache.get_active_down_weight(),
-            self.down_proj_buffer,
-            self.combined_proj_buffer,
-            "silu"
-        )
-        return out
-
 class Qwen2SkipDecoderLayer(SkipDecoderLayer):
     def _init_components(self, config: Qwen2SkipConnectionConfig, layer_idx: int):
         self.self_attn = Qwen2Attention(config=config, layer_idx=layer_idx)

@@ -1,4 +1,4 @@
-from transformers import Qwen2Config,  PretrainedConfig
+from transformers import  PretrainedConfig
 import os
 from typing import Union, Any, Type
 
