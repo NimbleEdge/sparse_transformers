@@ -106,7 +106,7 @@ class SkipDecoderLayer(ABC, GradientCheckpointingLayer):
         self.layer_idx = layer_idx
         self.sparsity = config.sparsity
 
-        self._init_components()
+        self._init_components(config, layer_idx)
 
         self.lora_size = int(config.intermediate_size * 0.04)
         self.mlp_lora_proj = FastLoRAProjection(
@@ -120,11 +120,11 @@ class SkipDecoderLayer(ABC, GradientCheckpointingLayer):
         # Only initialize predictor training components if explicitly enabled
         if self.is_training_config:
             # Standard MLP for ground truth collection during training
-            self._set_mlp_train(layer_idx)
+            self._set_mlp_train(config)
             # Loss function for predictor training
             self.predictor_loss_fn = nn.BCEWithLogitsLoss(reduction='mean')
         else:
-            self._set_mlp_inference()
+            self._set_mlp_inference(config)
 
     @abstractmethod
     def _init_components(self, config):
@@ -388,7 +388,7 @@ def build_skip_connection_model(pretrained_model_class: type[PreTrainedModel]) -
 
 
 def build_skip_connection_model_for_causal_lm(pretrained_model_class: type[PreTrainedModel], base_model_class: type[PreTrainedModel]) -> type[PreTrainedModel]:
-    class SkipConnectionForCausalLM(pretrained_model_class, GenerationMixin):
+    class SkipConnectionModelForCausalLM(pretrained_model_class, GenerationMixin):
         _tied_weights_keys = ["lm_head.weight"]
         _tp_plan = {"lm_head": "colwise_rep"}
         _pp_plan = {"lm_head": (["hidden_states"], ["logits"])}
@@ -520,7 +520,7 @@ def build_skip_connection_model_for_causal_lm(pretrained_model_class: type[PreTr
                 hidden_states=outputs.hidden_states,
                 attentions=outputs.attentions,
             )
-    return SkipConnectionForCausalLM
+    return SkipConnectionModelForCausalLM
 
 
 

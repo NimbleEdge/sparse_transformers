@@ -397,7 +397,7 @@ def main():
     checkpoint = config._name_or_path
     tokenizer = AutoTokenizer.from_pretrained(checkpoint, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.eos_token
-    model_name = checkpoint.split("-")[0].capitalize()
+    model_name = checkpoint.split("/")[1].split("-")[0].capitalize()
 
     # Get test prompts
     test_prompts = get_diverse_test_prompts()
