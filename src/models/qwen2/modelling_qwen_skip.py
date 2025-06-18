@@ -261,6 +261,7 @@ class Qwen2SkipConnectionModel(Qwen2SkipConnectionModelBase):
                 )
         return causal_mask
     
-Qwen2SkipConnectionForCausalLM: type[Qwen2SkipPreTrainedModel] = build_skip_connection_model_for_causal_lm(Qwen2SkipPreTrainedModel)
+Qwen2SkipConnectionForCausalLM: type[Qwen2SkipPreTrainedModel] = \
+    build_skip_connection_model_for_causal_lm(Qwen2SkipPreTrainedModel, Qwen2SkipConnectionModel)
     
 __all__ = [Qwen2SkipConnectionForCausalLM]

@@ -387,8 +387,8 @@ def build_skip_connection_model(pretrained_model_class: type[PreTrainedModel]) -
     return SkipConnectionModel
 
 
-def build_skip_connection_model_for_causal_lm(pretrained_model_class: type[PreTrainedModel]) -> type[PreTrainedModel]:
-    class SkipConnectionForCausalLM(ABC, pretrained_model_class, GenerationMixin):
+def build_skip_connection_model_for_causal_lm(pretrained_model_class: type[PreTrainedModel], base_model_class: type[PreTrainedModel]) -> type[PreTrainedModel]:
+    class SkipConnectionForCausalLM(pretrained_model_class, GenerationMixin):
         _tied_weights_keys = ["lm_head.weight"]
         _tp_plan = {"lm_head": "colwise_rep"}
         _pp_plan = {"lm_head": (["hidden_states"], ["logits"])}
@@ -409,16 +409,12 @@ def build_skip_connection_model_for_causal_lm(pretrained_model_class: type[PreTr
 
         def __init__(self, config):
             super().__init__(config)
-            self.model = self._init_components(config)
+            self.model = base_model_class(config)
             self.vocab_size = config.vocab_size
             self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
 
             # Initialize weights and apply final processing
             self.post_init()
-
-        @abstractmethod
-        def _init_components(self, config: PretrainedConfig):
-            pass
 
         def get_predictor_parameters(self):
             """Get parameters of all predictor networks for optimization."""

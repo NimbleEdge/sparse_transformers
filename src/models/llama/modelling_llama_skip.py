@@ -299,7 +299,8 @@ class LlamaSkipConnectionModel(LlamaSkipConnectionModelBase):
 
         return causal_mask
     
-LlamaSkipConnectionForCausalLM: type[LlamaSkipPreTrainedModel] = build_skip_connection_model_for_causal_lm(LlamaSkipPreTrainedModel)
+LlamaSkipConnectionForCausalLM: type[LlamaSkipPreTrainedModel] = \
+    build_skip_connection_model_for_causal_lm(LlamaSkipPreTrainedModel, LlamaSkipConnectionModel)
 
 
 __all__ = [LlamaSkipConnectionForCausalLM]
