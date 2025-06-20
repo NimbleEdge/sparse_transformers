@@ -35,9 +35,6 @@ from sparse_transformers import (
     WeightCache,
     approx_topk_threshold
 )
-from src.modeling_utils import (
-    FastLoRAProjection, BaseModelOutputWithPastAndPredictorLoss
-)
 
 from src.models.qwen2.configuration_qwen_skip import Qwen2SkipConnectionConfig
 from src.modeling_skip import SkipMLP, SkipDecoderLayer, build_skip_connection_model, build_skip_connection_model_for_causal_lm

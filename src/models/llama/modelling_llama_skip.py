@@ -37,9 +37,6 @@ from sparse_transformers import (
 )
 
 from src.models.llama.configuration_llama_skip import LlamaSkipConnectionConfig
-from src.modeling_utils import (
-    FastLoRAProjection, BaseModelOutputWithPastAndPredictorLoss
-)
 from src.modeling_skip import SkipMLP, SkipDecoderLayer, build_skip_connection_model, build_skip_connection_model_for_causal_lm
 
 logger = logging.get_logger(__name__)
