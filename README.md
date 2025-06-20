@@ -1,4 +1,4 @@
-[![Join us on Discord](https://img.shields.io/badge/Join%20us-Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/CxzDDffR)
+[![Join us on Discord](https://img.shields.io/badge/Join%20us-Discord-5865F2?logo=discord&logoColor=white)](https://discord.gg/y8WkMncstk)
 
 # Fused Sparse C++ Kernels for Transformers
 
