@@ -48,6 +48,13 @@ class Phi3SkipMLP(SkipMLP):
         super().__init__(hidden_size, intermediate_size, sparsity, False)
         self.gate_up_proj = nn.Linear(hidden_size, 2 * intermediate_size, bias=False)
 
+    def _fix_unloaded_weights(self):
+        gate_proj_weight, up_proj_weight = self.gate_up_proj.weight.chunk(2, dim=0)
+        self.gate_proj.load_state_dict({'weight': gate_proj_weight}, assign=True)
+        self.up_proj.load_state_dict({'weight': up_proj_weight}, assign=True)
+        del self.gate_up_proj
+        return self
+
 
 class Phi3SkipDecoderLayer(SkipDecoderLayer):
     def _init_components(self, config: Phi3SkipConnectionConfig, layer_idx: int):

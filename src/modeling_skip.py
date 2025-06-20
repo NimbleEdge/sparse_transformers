@@ -59,7 +59,6 @@ class FastLoRAProjection(nn.Module):
         # Pre-allocate buffers on CPU initially
         self.register_buffer('intermediate', torch.zeros(1, lora_size))
         self.register_buffer('output', torch.zeros(1, intermediate_size))
-    
 
     def to(self, *args, **kwargs):
         # Move buffers to same device as model when .to() is called
@@ -69,6 +68,13 @@ class FastLoRAProjection(nn.Module):
             self.intermediate = self.intermediate.to(device)
             self.output = self.output.to(device)
         return super().to(*args, **kwargs)
+    
+    def _fix_unloaded_weights(self):
+        out = self.to_empty(device="cpu")
+        with torch.no_grad():
+            torch.nn.init.xavier_normal_(out.down.weight)
+            torch.nn.init.zeros_(out.up.weight)  # Initialize up projection to zeros for stable training
+        return out
     
     def _resize_buffers(self, batch_size: int, dtype: torch.dtype):
         if self.intermediate.size(0) != batch_size:
@@ -471,6 +477,15 @@ def build_skip_connection_model_for_causal_lm(pretrained_model_class: type[PreTr
 
             # Initialize weights and apply final processing
             self.post_init()
+
+        @classmethod
+        def from_pretrained(cls, *args, **kwargs):
+            out = super(SkipConnectionModelForCausalLM, cls).from_pretrained(*args, **kwargs)
+            for module in out.modules():
+                if any(hasattr(p, 'is_meta') and p.is_meta for p in module.parameters()) and \
+                        hasattr(module, '_fix_unloaded_weights'):
+                    module = module._fix_unloaded_weights()
+            return out
             
         def get_input_embeddings(self):
             return self.model.embed_tokens

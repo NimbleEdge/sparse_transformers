@@ -8,7 +8,6 @@ import numpy as np
 
 import torch
 from transformers import AutoModelForCausalLM, AutoConfig, AutoTokenizer
-from src.modeling_utils import FastLoRAProjection
 from src.utilities.cuda_utils import GPUMonitor, setup_cuda_debugging
 from src.utilities.sys_utils import print_system_info
 import src.models   # adds models to registry
@@ -407,12 +406,6 @@ def main():
 
     # Always run SkipLLaMA benchmark with HuggingFace
     skip_model = AutoModelForCausalLM.from_pretrained(checkpoint, config=config)
-    for module in skip_model.modules():
-        if any(hasattr(p, 'is_meta') and p.is_meta for p in module.parameters()) and isinstance(module, FastLoRAProjection):
-            module = module.to_empty(device="cpu")
-            with torch.no_grad():
-                torch.nn.init.xavier_normal_(module.down.weight)
-                torch.nn.init.zeros_(module.up.weight)  # Initialize up projection to zeros for stable training
     skip_model.tie_weights()
     
     skip_name = "Skip-%s" % model_name
