@@ -1,28 +1,28 @@
-# limitations under the License.
-from typing import Optional, Tuple, Union
+import math
+from typing import Callable, Optional, Tuple, Union
 
 import torch
-import torch.utils.checkpoint
-from torch import nn
 import torch.nn.functional as F
+from torch import nn
 
-from transformers import PreTrainedModel
-from dataclasses import dataclass
 from transformers.modeling_outputs import (
     CausalLMOutputWithPast,
     ModelOutput
 )
-from transformers.models.llama.modeling_llama import(
-     LlamaRotaryEmbedding,
-     LlamaMLP, LlamaAttention, KwargsForCausalLM, FlashAttentionKwargs
-)
+
 from transformers.modeling_attn_mask_utils import AttentionMaskConverter
 from transformers.processing_utils import Unpack
 from transformers.modeling_layers import GradientCheckpointingLayer
 from transformers.utils import logging, is_torch_flex_attn_available
-from transformers.cache_utils import Cache, DynamicCache
+from transformers.cache_utils import Cache, DynamicCache, SlidingWindowCache, StaticCache
 from transformers.generation import GenerationMixin
 from transformers.modeling_utils import PreTrainedModel
+
+
+from transformers.models.mistral.modeling_mistral import(
+    MistralMLP, MistralAttention, MistralRMSNorm, MistralRotaryEmbedding,
+    KwargsForCausalLM, FlashAttentionKwargs
+)
 
 if is_torch_flex_attn_available():
     from torch.nn.attention.flex_attention import BlockMask
@@ -36,109 +36,34 @@ from sparse_transformers import (
     approx_topk_threshold
 )
 
-from src.models.llama.configuration_llama_skip import LlamaSkipConnectionConfig
+from src.models.mistral.configuration_mistral_skip import MistralSkipConnectionConfig
 from src.modeling_skip import SkipMLP, SkipDecoderLayer, build_skip_connection_model, build_skip_connection_model_for_causal_lm
 
 logger = logging.get_logger(__name__)
 
-                     
-class LlamaSkipMLP(nn.Module):
-    def __init__(self, hidden_size: int, intermediate_size: int, sparsity: float, bias: bool = False):
-        super().__init__()
-        self.gate_proj = nn.Linear(hidden_size, intermediate_size, bias=bias)
-        self.up_proj = nn.Linear(hidden_size, intermediate_size, bias=bias)
-        self.down_proj = nn.Linear(intermediate_size, hidden_size, bias=bias)
-        self.sparsity = sparsity
-        self.hidden_size = hidden_size
-        self.intermediate_size = intermediate_size
-        
-        # Initialize mask but defer WeightCache creation until post_init
-        self.init_mask = torch.ones(intermediate_size, dtype=torch.bool)
-        self.init_mask[int(intermediate_size * sparsity):] = 0
-        
-        self.weight_cache = None
 
-        # Register buffers - start with reasonable size and ensure they can be resized
-        self.register_buffer('down_proj_buffer', torch.zeros(1, hidden_size, requires_grad=False))
-        self.register_buffer('combined_proj_buffer', torch.zeros(1, 2 * int(intermediate_size * sparsity), requires_grad=False))
+class MistralSkipDecoderLayer(SkipDecoderLayer):
+    def _init_components(self, config: MistralSkipConnectionConfig, layer_idx: int):
+        self.self_attn = MistralAttention(config=config, layer_idx=layer_idx)
+        self.input_layernorm = MistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.post_attention_layernorm = MistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
-    def initialize_weight_cache(self):
-        """Tie weights after weights are loaded (called from post_init)."""
-        if self.weight_cache is None:
-            # Create and initialize weight cache
-            self.weight_cache = WeightCache(   
-                self.init_mask,
-                self.hidden_size,
-                self.gate_proj.weight,
-                self.up_proj.weight, 
-                self.down_proj.weight
-            )
+    def _set_mlp_train(self, config: MistralSkipConnectionConfig):
+        self.mlp = MistralMLP(config)
 
-    def to(self, *args, **kwargs):
-        # Move buffers to same device as model when .to() is called
-        result = super().to(*args, **kwargs)
-        device = args[0] if args else kwargs.get('device')
-        if device:
-            self.down_proj_buffer = self.down_proj_buffer.to(device)
-            self.combined_proj_buffer = self.combined_proj_buffer.to(device)
-            if hasattr(self, 'init_mask'):
-                self.init_mask = self.init_mask.to(device)
-        return result
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = sparse_mlp_forward(
-            x.detach(), 
-            self.weight_cache.get_concat_weight(),
-            self.weight_cache.get_active_down_weight(),
-            self.down_proj_buffer,
-            self.combined_proj_buffer,
-            "silu"
-        )
-        return out
-
-class LlamaSkipRMSNorm(nn.Module):
-    def __init__(self, hidden_size, eps=1e-5):
-        """
-        LlamaSkipRMSNorm is equivalent to T5LayerNorm
-        """
-        super().__init__()
-        self.eps = eps
-        self.weight = nn.Parameter(torch.ones(hidden_size))
-
-    def _norm(self, x):
-        return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps)
-
-    def forward(self, x):
-        output = self._norm(x.float()).type_as(x)
-        return output * self.weight
-
-    def extra_repr(self):
-        return f"{tuple(self.weight.shape)}, eps={self.eps}"
-        
-class LlamaSkipDecoderLayer(SkipDecoderLayer):
-    def _init_components(self, config, layer_idx):
-        self.self_attn = LlamaAttention(config=config, layer_idx=layer_idx)
-        self.input_layernorm = LlamaSkipRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-        self.post_attention_layernorm = LlamaSkipRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-
-    def _set_mlp_train(self, config: LlamaSkipConnectionConfig):
-        self.mlp = LlamaMLP(config)
-
-    def _set_mlp_inference(self, config: LlamaSkipConnectionConfig):
+    def _set_mlp_inference(self, config: MistralSkipConnectionConfig):
         self.mlp = SkipMLP(
             config.hidden_size,
             config.intermediate_size,
             config.sparsity,
-            config.mlp_bias,
+            False,
         )
 
-
-
-class LlamaSkipPreTrainedModel(PreTrainedModel):
-    config_class = LlamaSkipConnectionConfig
+class MistralSkipPreTrainedModel(PreTrainedModel):
+    config_class = MistralSkipConnectionConfig
     base_model_prefix = "model"
     supports_gradient_checkpointing = True
-    _no_split_modules = ["LlamaSkipDecoderLayer"]
+    _no_split_modules = ["MistralSkipDecoderLayer"]
     _skip_keys_device_placement = ["past_key_values"]
     _supports_flash_attn_2 = True
     _supports_sdpa = True
@@ -158,20 +83,20 @@ class LlamaSkipPreTrainedModel(PreTrainedModel):
             module.weight.data.normal_(mean=0.0, std=std)
             if module.padding_idx is not None:
                 module.weight.data[module.padding_idx].zero_()
-        elif isinstance(module, LlamaSkipRMSNorm):
+        elif isinstance(module, MistralRMSNorm):
             module.weight.data.fill_(1.0)
 
 
-LlamaSkipConnectionModelBase: type[LlamaSkipPreTrainedModel] = build_skip_connection_model(LlamaSkipPreTrainedModel)
+MistralSkipConnectionModelBase: type[MistralSkipPreTrainedModel] = build_skip_connection_model(MistralSkipPreTrainedModel)
 
-class LlamaSkipConnectionModel(LlamaSkipConnectionModelBase):
-    def _init_components(self, config: LlamaSkipConnectionConfig):
+class MistralSkipConnectionModel(MistralSkipConnectionModelBase):
+    def _init_components(self, config: MistralSkipConnectionConfig):
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
         self.layers = nn.ModuleList(
-            [LlamaSkipDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
+            [MistralSkipDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )
-        self.norm = LlamaSkipRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-        self.rotary_emb = LlamaRotaryEmbedding(config=config)
+        self.norm = MistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.rotary_emb = MistralRotaryEmbedding(config=config)
 
     def _update_causal_mask(
         self,
@@ -182,7 +107,15 @@ class LlamaSkipConnectionModel(LlamaSkipConnectionModelBase):
         output_attentions: bool = False,
     ):
         if self.config._attn_implementation == "flash_attention_2":
-            if attention_mask is not None and (attention_mask == 0.0).any():
+            if attention_mask is not None and past_key_values is not None:
+                is_padding_right = attention_mask[:, -1].sum().item() != input_tensor.size()[0]
+                if is_padding_right:
+                    raise ValueError(
+                        "You are attempting to perform batched generation with padding_side='right'"
+                        " this may lead to unexpected behaviour for Flash Attention version of Mistral. Make sure to "
+                        " call `tokenizer.padding_side  = 'left'` before tokenizing the input. "
+                    )
+            if attention_mask is not None and 0.0 in attention_mask:
                 return attention_mask
             return None
         if self.config._attn_implementation == "flex_attention":
@@ -194,22 +127,31 @@ class LlamaSkipConnectionModel(LlamaSkipConnectionModelBase):
         # order to dispatch on Flash Attention 2. This feature is not compatible with static cache, as SDPA will fail
         # to infer the attention mask.
         past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
-        using_compilable_cache = past_key_values.is_compileable if past_key_values is not None else False
+        using_static_cache = isinstance(past_key_values, StaticCache)
+        using_sliding_window_cache = isinstance(past_key_values, SlidingWindowCache)
 
         # When output attentions is True, sdpa implementation's forward method calls the eager implementation's forward
-        if self.config._attn_implementation == "sdpa" and not using_compilable_cache and not output_attentions:
+        if (
+            self.config._attn_implementation == "sdpa"
+            and not (using_static_cache or using_sliding_window_cache)
+            and not output_attentions
+        ):
             if AttentionMaskConverter._ignore_causal_mask_sdpa(
                 attention_mask,
                 inputs_embeds=input_tensor,
                 past_key_values_length=past_seen_tokens,
+                sliding_window=self.config.sliding_window,
                 is_training=self.training,
             ):
                 return None
 
         dtype = input_tensor.dtype
+        min_dtype = torch.finfo(dtype).min
         sequence_length = input_tensor.shape[1]
-        if using_compilable_cache:
+        # SlidingWindowCache or StaticCache
+        if using_sliding_window_cache or using_static_cache:
             target_length = past_key_values.get_max_cache_shape()
+        # DynamicCache or no cache
         else:
             target_length = (
                 attention_mask.shape[-1]
@@ -225,6 +167,8 @@ class LlamaSkipConnectionModel(LlamaSkipConnectionModelBase):
             dtype=dtype,
             cache_position=cache_position,
             batch_size=input_tensor.shape[0],
+            config=self.config,
+            past_key_values=past_key_values,
         )
 
         if (
@@ -236,7 +180,6 @@ class LlamaSkipConnectionModel(LlamaSkipConnectionModelBase):
             # Attend to all tokens in fully masked rows in the causal_mask, for example the relevant first rows when
             # using left padding. This is required by F.scaled_dot_product_attention memory-efficient attention path.
             # Details: https://github.com/pytorch/pytorch/issues/110213
-            min_dtype = torch.finfo(dtype).min
             causal_mask = AttentionMaskConverter._unmask_unattended(causal_mask, min_dtype)
 
         return causal_mask
@@ -249,7 +192,8 @@ class LlamaSkipConnectionModel(LlamaSkipConnectionModelBase):
         dtype: torch.dtype,
         cache_position: torch.Tensor,
         batch_size: int,
-        **kwargs,
+        config: MistralSkipConnectionConfig,
+        past_key_values: Cache,
     ):
         """
         Creates a causal 4D mask of shape `(batch_size, 1, query_length, key_value_length)` from a 2D mask of shape
@@ -257,19 +201,21 @@ class LlamaSkipConnectionModel(LlamaSkipConnectionModelBase):
 
         Args:
             attention_mask (`torch.Tensor`):
-                A 2D attention mask of shape `(batch_size, key_value_length)` or a 4D attention mask of shape
-                `(batch_size, 1, query_length, key_value_length)`.
+                A 2D attention mask of shape `(batch_size, key_value_length)` or a 4D attention mask of shape `(batch_size, 1, query_length, key_value_length)`.
             sequence_length (`int`):
                 The sequence length being processed.
             target_length (`int`):
-                The target length: when generating with static cache, the mask should be as long as the static cache,
-                to account for the 0 padding, the part of the cache that is not filled yet.
+                The target length: when generating with static cache, the mask should be as long as the static cache, to account for the 0 padding, the part of the cache that is not filled yet.
             dtype (`torch.dtype`):
                 The dtype to use for the 4D attention mask.
             cache_position (`torch.Tensor`):
                 Indices depicting the position of the input sequence tokens in the sequence.
             batch_size (`torch.Tensor`):
                 Batch size.
+            config (`MistralConfig`):
+                The model's configuration class
+            past_key_values (`Cache`):
+                The cache class that is being used currently to generate
         """
         if attention_mask is not None and attention_mask.dim() == 4:
             # In this case we assume that the mask comes already in inverted form and requires no inversion or slicing.
@@ -279,12 +225,24 @@ class LlamaSkipConnectionModel(LlamaSkipConnectionModelBase):
             causal_mask = torch.full(
                 (sequence_length, target_length), fill_value=min_dtype, dtype=dtype, device=cache_position.device
             )
-            if sequence_length != 1:
-                causal_mask = torch.triu(causal_mask, diagonal=1)
-            causal_mask *= torch.arange(target_length, device=cache_position.device) > cache_position.reshape(-1, 1)
+            diagonal_attend_mask = torch.arange(target_length, device=cache_position.device) > cache_position.reshape(
+                -1, 1
+            )
+            text_config = config.get_text_config()
+            if getattr(text_config, "use_sliding_window", True) and text_config.sliding_window is not None:
+                # if we have sliding window, we should not attend to tokens beyond sliding window length, so we mask them out also
+                # the check is needed to verify is current checkpoint was trained with sliding window or not
+                if not isinstance(past_key_values, SlidingWindowCache) or sequence_length > target_length:
+                    sliding_attend_mask = torch.arange(target_length, device=cache_position.device) <= (
+                        cache_position.reshape(-1, 1) - text_config.sliding_window
+                    )
+                    diagonal_attend_mask.bitwise_or_(sliding_attend_mask)
+            causal_mask *= diagonal_attend_mask
             causal_mask = causal_mask[None, None, :, :].expand(batch_size, 1, -1, -1)
             if attention_mask is not None:
                 causal_mask = causal_mask.clone()  # copy to contiguous memory for in-place edit
+                if attention_mask.shape[-1] > target_length:
+                    attention_mask = attention_mask[:, :target_length]
                 mask_length = attention_mask.shape[-1]
                 padding_mask = causal_mask[:, :, :, :mask_length] + attention_mask[:, None, None, :].to(
                     causal_mask.device
@@ -293,11 +251,9 @@ class LlamaSkipConnectionModel(LlamaSkipConnectionModelBase):
                 causal_mask[:, :, :, :mask_length] = causal_mask[:, :, :, :mask_length].masked_fill(
                     padding_mask, min_dtype
                 )
-
         return causal_mask
-    
-LlamaSkipConnectionForCausalLM: type[LlamaSkipPreTrainedModel] = \
-    build_skip_connection_model_for_causal_lm(LlamaSkipPreTrainedModel, LlamaSkipConnectionModel)
 
+MistralSkipConnectionForCausalLM: type[MistralSkipPreTrainedModel] = \
+    build_skip_connection_model_for_causal_lm(MistralSkipPreTrainedModel, MistralSkipConnectionModel)
 
-__all__ = [LlamaSkipConnectionForCausalLM]
+__all__ = [MistralSkipConnectionForCausalLM]

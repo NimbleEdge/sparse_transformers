@@ -36,12 +36,74 @@ from sparse_transformers import (
     approx_topk_threshold
 )
 
-from src.modeling_utils import (
-    FastLoRAProjection, BaseModelOutputWithPastAndPredictorLoss
-)
-
 logger = logging.get_logger(__name__)
 
+@dataclass
+class BaseModelOutputWithPastAndPredictorLoss(ModelOutput):
+    loss: Optional[torch.FloatTensor] = None
+    last_hidden_state: Optional[torch.FloatTensor] = None
+    past_key_values: Optional[Tuple[Tuple[torch.FloatTensor]]] = None
+    hidden_states: Optional[Tuple[torch.FloatTensor, ...]] = None
+    attentions: Optional[Tuple[torch.FloatTensor, ...]] = None    
+
+
+class FastLoRAProjection(nn.Module):
+    def __init__(self, hidden_size, intermediate_size, lora_size):
+        super().__init__()
+        self.hidden_size = hidden_size
+        self.intermediate_size = intermediate_size
+        self.lora_size = lora_size
+        # Force creation of linear layers with actual tensors (not meta tensors)
+        self.down = nn.Linear(hidden_size, lora_size, bias=False)
+        self.up = nn.Linear(lora_size, intermediate_size, bias=False)
+        # Pre-allocate buffers on CPU initially
+        self.register_buffer('intermediate', torch.zeros(1, lora_size))
+        self.register_buffer('output', torch.zeros(1, intermediate_size))
+
+    def to(self, *args, **kwargs):
+        # Move buffers to same device as model when .to() is called
+        device = args[0] if args else kwargs.get('device')
+        
+        if device:
+            self.intermediate = self.intermediate.to(device)
+            self.output = self.output.to(device)
+        return super().to(*args, **kwargs)
+    
+    def _fix_unloaded_weights(self):
+        out = self.to_empty(device="cpu")
+        with torch.no_grad():
+            torch.nn.init.xavier_normal_(out.down.weight)
+            torch.nn.init.zeros_(out.up.weight)  # Initialize up projection to zeros for stable training
+        return out
+    
+    def _resize_buffers(self, batch_size: int, dtype: torch.dtype):
+        if self.intermediate.size(0) != batch_size:
+            self.intermediate.resize_(batch_size, self.lora_size)
+            self.intermediate = self.intermediate.to(dtype=dtype)
+            self.intermediate.fill_(0.0)  # Explicitly initialize with zeros
+            self.output.resize_(batch_size, self.intermediate_size)
+            self.output = self.output.to(dtype=dtype)
+            self.output.fill_(0.0)  # Explicitly initialize with zeros
+   
+    def forward(self, x):
+        batch_size = x.size(0)
+        
+        # Check if gradients are required (training mode)
+        if self.training:
+            # Use regular matrix multiplication for gradient computation
+            intermediate = torch.mm(x, self.down.weight.t())
+            output = torch.mm(intermediate, self.up.weight.t())
+            return output
+        else:
+            # # Use optimized in-place operations for inference
+            # intermediate = torch.mm(x, self.down.weight.t())
+            # output = torch.mm(intermediate, self.up.weight.t())
+            # return output
+        
+            self._resize_buffers(batch_size, x.dtype)
+            torch.mm(x, self.down.weight.t(), out=self.intermediate)
+            torch.mm(self.intermediate, self.up.weight.t(), out=self.output)
+            return self.output
                      
 class SkipMLP(nn.Module):
     def __init__(self, hidden_size: int, intermediate_size: int, sparsity: float, bias: bool = False):
@@ -415,6 +477,15 @@ def build_skip_connection_model_for_causal_lm(pretrained_model_class: type[PreTr
 
             # Initialize weights and apply final processing
             self.post_init()
+
+        @classmethod
+        def from_pretrained(cls, *args, **kwargs):
+            out = super(SkipConnectionModelForCausalLM, cls).from_pretrained(*args, **kwargs)
+            for module in out.modules():
+                if any(hasattr(p, 'is_meta') and p.is_meta for p in module.parameters()) and \
+                        hasattr(module, '_fix_unloaded_weights'):
+                    module = module._fix_unloaded_weights()
+            return out
             
         def get_input_embeddings(self):
             return self.model.embed_tokens

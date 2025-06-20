@@ -8,4 +8,6 @@ attrs
 scikit-learn
 accelerate
 datasets
+sentencepiece
+protobuf
 #wandb
