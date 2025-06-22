@@ -1,27 +1,16 @@
-import math
-from typing import Callable, Optional, Tuple, Union
+from typing import Union
 
 import torch
-import torch.nn.functional as F
 from torch import nn
 
-from transformers.modeling_outputs import (
-    CausalLMOutputWithPast,
-    ModelOutput
-)
-
 from transformers.modeling_attn_mask_utils import AttentionMaskConverter
-from transformers.processing_utils import Unpack
-from transformers.modeling_layers import GradientCheckpointingLayer
-from transformers.utils import logging, is_torch_flex_attn_available
-from transformers.cache_utils import Cache, DynamicCache, SlidingWindowCache, StaticCache
-from transformers.generation import GenerationMixin
+from transformers.utils import logging
+from transformers.cache_utils import Cache, SlidingWindowCache, StaticCache
 from transformers.modeling_utils import PreTrainedModel
 
 
 from transformers.models.mistral.modeling_mistral import(
     MistralMLP, MistralAttention, MistralRMSNorm, MistralRotaryEmbedding,
-    KwargsForCausalLM, FlashAttentionKwargs
 )
 
 if is_torch_flex_attn_available():
@@ -43,15 +32,15 @@ logger = logging.get_logger(__name__)
 
 
 class MistralSkipDecoderLayer(SkipDecoderLayer):
-    def _init_components(self, config: MistralSkipConnectionConfig, layer_idx: int):
+    def _init_components(self, config, layer_idx):
         self.self_attn = MistralAttention(config=config, layer_idx=layer_idx)
         self.input_layernorm = MistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = MistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
-    def _set_mlp_train(self, config: MistralSkipConnectionConfig):
+    def _set_mlp_train(self, config):
         self.mlp = MistralMLP(config)
 
-    def _set_mlp_inference(self, config: MistralSkipConnectionConfig):
+    def _set_mlp_inference(self, config):
         self.mlp = SkipMLP(
             config.hidden_size,
             config.intermediate_size,
@@ -90,8 +79,8 @@ class MistralSkipPreTrainedModel(PreTrainedModel):
 MistralSkipConnectionModelBase: type[MistralSkipPreTrainedModel] = build_skip_connection_model(MistralSkipPreTrainedModel)
 
 class MistralSkipConnectionModel(MistralSkipConnectionModelBase):
-    def _init_components(self, config: MistralSkipConnectionConfig):
-        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
+    def _init_components(self, config):
+        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx) # type: ignore
         self.layers = nn.ModuleList(
             [MistralSkipDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )
@@ -253,7 +242,4 @@ class MistralSkipConnectionModel(MistralSkipConnectionModelBase):
                 )
         return causal_mask
 
-MistralSkipConnectionForCausalLM: type[MistralSkipPreTrainedModel] = \
-    build_skip_connection_model_for_causal_lm(MistralSkipPreTrainedModel, MistralSkipConnectionModel)
-
-__all__ = [MistralSkipConnectionForCausalLM]
+MistralSkipConnectionForCausalLM = build_skip_connection_model_for_causal_lm(MistralSkipPreTrainedModel, MistralSkipConnectionModel)

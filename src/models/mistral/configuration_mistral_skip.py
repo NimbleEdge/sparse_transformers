@@ -1,6 +1,4 @@
-from transformers import MistralConfig,  PretrainedConfig
-import os
-from typing import Union, Any
+from transformers import MistralConfig
 from src.configuration_skip import build_skip_config
 
-MistralSkipConnectionConfig: type[MistralConfig] = build_skip_config(MistralConfig, "mistral-skip")
+MistralSkipConnectionConfig = build_skip_config(MistralConfig, "mistral-skip")

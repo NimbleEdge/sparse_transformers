@@ -1,39 +1,23 @@
 # limitations under the License.
-from typing import Optional, Tuple, Union
+from typing import Union
 
 import torch
-import torch.utils.checkpoint
 from torch import nn
-import torch.nn.functional as F
 
-from transformers import PreTrainedModel
-from dataclasses import dataclass
-from transformers.modeling_outputs import (
-    CausalLMOutputWithPast,
-    ModelOutput
-)
+from transformers.modeling_utils import PreTrainedModel
 from transformers.models.llama.modeling_llama import(
      LlamaRotaryEmbedding,
-     LlamaMLP, LlamaAttention, KwargsForCausalLM, FlashAttentionKwargs
+     LlamaMLP, LlamaAttention
 )
 from transformers.modeling_attn_mask_utils import AttentionMaskConverter
-from transformers.processing_utils import Unpack
-from transformers.modeling_layers import GradientCheckpointingLayer
-from transformers.utils import logging, is_torch_flex_attn_available
-from transformers.cache_utils import Cache, DynamicCache
-from transformers.generation import GenerationMixin
+from transformers.utils import logging
+from transformers.cache_utils import Cache
 from transformers.modeling_utils import PreTrainedModel
-
-if is_torch_flex_attn_available():
-    from torch.nn.attention.flex_attention import BlockMask
-
-    from transformers.integrations.flex_attention import make_flex_block_causal_mask
 
 # Import C++ extensions
 from sparse_transformers import (
     sparse_mlp_forward,
     WeightCache,
-    approx_topk_threshold
 )
 
 from src.models.llama.configuration_llama_skip import LlamaSkipConnectionConfig
@@ -88,8 +72,8 @@ class LlamaSkipMLP(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = sparse_mlp_forward(
             x.detach(), 
-            self.weight_cache.get_concat_weight(),
-            self.weight_cache.get_active_down_weight(),
+            self.weight_cache.get_concat_weight(), # type: ignore
+            self.weight_cache.get_active_down_weight(), # type: ignore
             self.down_proj_buffer,
             self.combined_proj_buffer,
             "silu"
@@ -121,10 +105,10 @@ class LlamaSkipDecoderLayer(SkipDecoderLayer):
         self.input_layernorm = LlamaSkipRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = LlamaSkipRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
-    def _set_mlp_train(self, config: LlamaSkipConnectionConfig):
+    def _set_mlp_train(self, config):
         self.mlp = LlamaMLP(config)
 
-    def _set_mlp_inference(self, config: LlamaSkipConnectionConfig):
+    def _set_mlp_inference(self, config):
         self.mlp = SkipMLP(
             config.hidden_size,
             config.intermediate_size,
@@ -162,11 +146,11 @@ class LlamaSkipPreTrainedModel(PreTrainedModel):
             module.weight.data.fill_(1.0)
 
 
-LlamaSkipConnectionModelBase: type[LlamaSkipPreTrainedModel] = build_skip_connection_model(LlamaSkipPreTrainedModel)
+LlamaSkipConnectionModelBase = build_skip_connection_model(LlamaSkipPreTrainedModel)
 
 class LlamaSkipConnectionModel(LlamaSkipConnectionModelBase):
-    def _init_components(self, config: LlamaSkipConnectionConfig):
-        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
+    def _init_components(self, config):
+        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx) # type: ignore
         self.layers = nn.ModuleList(
             [LlamaSkipDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )
@@ -175,7 +159,7 @@ class LlamaSkipConnectionModel(LlamaSkipConnectionModelBase):
 
     def _update_causal_mask(
         self,
-        attention_mask: Union[torch.Tensor, "BlockMask"],
+        attention_mask: Union[torch.Tensor, "BlockMask"], # type: ignore
         input_tensor: torch.Tensor,
         cache_position: torch.Tensor,
         past_key_values: Cache,
@@ -187,7 +171,7 @@ class LlamaSkipConnectionModel(LlamaSkipConnectionModelBase):
             return None
         if self.config._attn_implementation == "flex_attention":
             if isinstance(attention_mask, torch.Tensor):
-                attention_mask = make_flex_block_causal_mask(attention_mask)
+                attention_mask = make_flex_block_causal_mask(attention_mask) # type: ignore
             return attention_mask
 
         # For SDPA, when possible, we will rely on its `is_causal` argument instead of its `attn_mask` argument, in
@@ -221,7 +205,7 @@ class LlamaSkipConnectionModel(LlamaSkipConnectionModelBase):
         causal_mask = self._prepare_4d_causal_attention_mask_with_cache_position(
             attention_mask,
             sequence_length=sequence_length,
-            target_length=target_length,
+            target_length=target_length, # type: ignore
             dtype=dtype,
             cache_position=cache_position,
             batch_size=input_tensor.shape[0],
@@ -237,7 +221,7 @@ class LlamaSkipConnectionModel(LlamaSkipConnectionModelBase):
             # using left padding. This is required by F.scaled_dot_product_attention memory-efficient attention path.
             # Details: https://github.com/pytorch/pytorch/issues/110213
             min_dtype = torch.finfo(dtype).min
-            causal_mask = AttentionMaskConverter._unmask_unattended(causal_mask, min_dtype)
+            causal_mask = AttentionMaskConverter._unmask_unattended(causal_mask, min_dtype) # type: ignore
 
         return causal_mask
 
@@ -296,8 +280,4 @@ class LlamaSkipConnectionModel(LlamaSkipConnectionModelBase):
 
         return causal_mask
     
-LlamaSkipConnectionForCausalLM: type[LlamaSkipPreTrainedModel] = \
-    build_skip_connection_model_for_causal_lm(LlamaSkipPreTrainedModel, LlamaSkipConnectionModel)
-
-
-__all__ = [LlamaSkipConnectionForCausalLM]
+LlamaSkipConnectionForCausalLM = build_skip_connection_model_for_causal_lm(LlamaSkipPreTrainedModel, LlamaSkipConnectionModel)

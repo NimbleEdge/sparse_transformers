@@ -1,28 +1,23 @@
 
 import math
-from typing import Callable, Optional, Tuple, Union
+from typing import Optional, Tuple, Union
 
 import torch
-import torch.nn.functional as F
 from torch import nn
 
 from transformers.modeling_outputs import (
-    CausalLMOutputWithPast,
-    ModelOutput
+    CausalLMOutputWithPast
 )
 
 from transformers.modeling_attn_mask_utils import AttentionMaskConverter
 from transformers.processing_utils import Unpack
-from transformers.modeling_layers import GradientCheckpointingLayer
-from transformers.utils import logging, is_torch_flex_attn_available
-from transformers.cache_utils import Cache, DynamicCache, SlidingWindowCache, StaticCache
-from transformers.generation import GenerationMixin
+from transformers.utils import logging
+from transformers.cache_utils import Cache, SlidingWindowCache, StaticCache
 from transformers.modeling_utils import PreTrainedModel
 
 
 from transformers.models.phi3.modeling_phi3 import(
     Phi3MLP, Phi3Attention, Phi3RMSNorm, Phi3RotaryEmbedding,
-    KwargsForCausalLM, FlashAttentionKwargs
 )
 
 if is_torch_flex_attn_available():
@@ -32,9 +27,6 @@ if is_torch_flex_attn_available():
 
 # Import C++ extensions
 from sparse_transformers import (
-    sparse_mlp_forward,
-    WeightCache,
-    approx_topk_threshold
 )
 
 from src.models.phi3.configuration_phi_skip import Phi3SkipConnectionConfig
@@ -57,17 +49,17 @@ class Phi3SkipMLP(SkipMLP):
 
 
 class Phi3SkipDecoderLayer(SkipDecoderLayer):
-    def _init_components(self, config: Phi3SkipConnectionConfig, layer_idx: int):
+    def _init_components(self, config, layer_idx):
         self.self_attn = Phi3Attention(config=config, layer_idx=layer_idx)
         self.input_layernorm = Phi3RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = Phi3RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.resid_attn_dropout = nn.Dropout(config.resid_pdrop)
         self.resid_mlp_dropout = nn.Dropout(config.resid_pdrop)
 
-    def _set_mlp_train(self, config: Phi3SkipConnectionConfig):
+    def _set_mlp_train(self, config):
         self.mlp = Phi3MLP(config)
 
-    def _set_mlp_inference(self, config: Phi3SkipConnectionConfig):
+    def _set_mlp_inference(self, config):
         self.mlp = Phi3SkipMLP(
             config.hidden_size,
             config.intermediate_size,
@@ -85,7 +77,7 @@ class Phi3SkipDecoderLayer(SkipDecoderLayer):
         cache_position: Optional[torch.LongTensor] = None,
         position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # necessary, but kept here for BC
         **kwargs: Unpack[FlashAttentionKwargs],
-    ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+    ):
         """
         Args:
             hidden_states (`torch.FloatTensor`):
@@ -175,8 +167,8 @@ class Phi3SkipPreTrainedModel(PreTrainedModel):
 Phi3SkipConnectionModelBase: type[Phi3SkipPreTrainedModel] = build_skip_connection_model(Phi3SkipPreTrainedModel)
 
 class Phi3SkipConnectionModel(Phi3SkipConnectionModelBase):
-    def _init_components(self, config: Phi3SkipConnectionConfig):
-        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
+    def _init_components(self, config):
+        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx) # type: ignore
         self.layers = nn.ModuleList(
             [Phi3SkipDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )
@@ -288,7 +280,7 @@ class Phi3SkipConnectionModel(Phi3SkipConnectionModelBase):
         dtype: torch.dtype,
         cache_position: torch.Tensor,
         batch_size: int,
-        config: Phi3SkipConnectionConfig,
+        config,
         past_key_values: Cache,
     ):
         """
@@ -350,9 +342,7 @@ class Phi3SkipConnectionModel(Phi3SkipConnectionModelBase):
         return causal_mask
     
 
-Phi3SkipConnectionForCausalLMBase: type[Phi3SkipPreTrainedModel] = \
-    build_skip_connection_model_for_causal_lm(Phi3SkipPreTrainedModel, Phi3SkipConnectionModel)
-
+Phi3SkipConnectionForCausalLMBase = build_skip_connection_model_for_causal_lm(Phi3SkipPreTrainedModel, Phi3SkipConnectionModel)
 
 class Phi3SkipConnectionForCausalLM(Phi3SkipConnectionForCausalLMBase):
     _keys_to_ignore_on_load_missing = [
@@ -411,5 +401,3 @@ class Phi3SkipConnectionForCausalLM(Phi3SkipConnectionForCausalLMBase):
         )
         return model_inputs
     
-
-__all__ = [Phi3SkipConnectionForCausalLM]

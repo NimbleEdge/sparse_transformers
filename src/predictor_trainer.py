@@ -96,16 +96,10 @@ class LayerwisePredictorTrainer:
         pred_scores = self.predictors[layer_idx](hidden_states)  # [batch_size, intermediate_size]
         
         # Get top-k indices from ground truth
-        gt_magnitudes = torch.abs(mlp_activations)
-        _, gt_indices = torch.topk(gt_magnitudes, k, dim=-1)  # [batch_size, k]
-        
-        # Create one-hot targets
-        batch_size = hidden_states.shape[0]
-        targets = torch.zeros(batch_size, self.intermediate_size, device=self.device)
-        targets.scatter_(1, gt_indices, 1.0)
+        gt_mask = (mlp_activations > 0).long()
         
         # Compute binary cross-entropy loss
-        loss = F.binary_cross_entropy_with_logits(pred_scores, targets)
+        loss = F.binary_cross_entropy_with_logits(pred_scores, gt_mask)
         
         return loss
     
