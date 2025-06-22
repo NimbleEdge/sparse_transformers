@@ -126,31 +126,23 @@ class LayerwisePredictorTrainer:
                 
                 # Get predictions
                 pred_scores = self.predictors[layer_idx](hidden_states)
-                _, pred_indices = torch.topk(pred_scores, k, dim=-1)
+                pred_mask = (F.sigmoid(pred_scores) > 0.5)
                 
                 # Get ground truth
-                gt_magnitudes = torch.abs(mlp_activations)
-                _, gt_indices = torch.topk(gt_magnitudes, k, dim=-1)
+                gt_mask = (mlp_activations > 0)
+                tp = (pred_mask * gt_mask).sum().item()
+                fp = (pred_mask * (1 - gt_mask)).sum().item()
+                fn = ((1 - pred_mask) * gt_mask).sum().item()
                 
-                # Calculate metrics
-                batch_size = hidden_states.shape[0]
-                for i in range(batch_size):
-                    pred_set = set(pred_indices[i].cpu().numpy())
-                    gt_set = set(gt_indices[i].cpu().numpy())
-                    
-                    tp = len(pred_set & gt_set)
-                    fp = len(pred_set - gt_set)
-                    fn = len(gt_set - pred_set)
-                    
-                    precision = tp / (tp + fp) if (tp + fp) > 0 else 0
-                    recall = tp / (tp + fn) if (tp + fn) > 0 else 0
-                    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
-                    
-                    total_precision += precision
-                    total_recall += recall
-                    total_f1 += f1
+                precision = tp / (tp + fp + 1e-8)
+                recall = tp / (tp + fn + 1e-8)
+                f1 = 2 * precision * recall / (precision + recall + 1e-8)
                 
-                num_batches += batch_size
+                total_precision += precision
+                total_recall += recall
+                total_f1 += f1
+                
+                num_batches += hidden_states.shape[0]
         
         self.predictors[layer_idx].train()
         
