@@ -151,8 +151,8 @@ class SkipMLP(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         out = sparse_mlp_forward(
             x.detach(), 
-            self.weight_cache.get_concat_weight(),
-            self.weight_cache.get_active_down_weight(),
+            self.weight_cache.get_concat_weight(),  # type: ignore
+            self.weight_cache.get_active_down_weight(),  # type: ignore
             self.down_proj_buffer,
             self.combined_proj_buffer,
             "silu"
@@ -239,7 +239,7 @@ class SkipDecoderLayer(ABC, GradientCheckpointingLayer):
         # 3. Binary mask creation
         binary_mask = (lora_proj_scores >= lora_proj_scores.mean() + 2 * lora_proj_scores.std()).bool()
         # Normalize 2D mask to 1D by taking union across batch dimension
-        self.weight_cache.update_active_weights(binary_mask.any(dim=0))  # [batch_size, intermediate_size] → [intermediate_size]
+        self.weight_cache.update_active_weights(binary_mask.any(dim=0))  # type: ignore
     
     def forward(
         self,
@@ -252,9 +252,9 @@ class SkipDecoderLayer(ABC, GradientCheckpointingLayer):
         cache_position: Optional[torch.LongTensor] = None,
         position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # necessary, but kept here for BC
         **kwargs: Unpack[FlashAttentionKwargs],
-    ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+    ):
         residual = hidden_states
-        hidden_states = self.input_layernorm(hidden_states)
+        hidden_states = self.input_layernorm(hidden_states)  # type: ignore
         if not self.training:  # Use PyTorch's built-in training flag
             self._compute_binary_mask(hidden_states)
           
@@ -269,13 +269,13 @@ class SkipDecoderLayer(ABC, GradientCheckpointingLayer):
             cache_position=cache_position,
             position_embeddings=position_embeddings,
             **kwargs,
-        )
+        )  # type: ignore
         hidden_states = residual + hidden_states
 
         # Fully Connected
         residual = hidden_states
-        hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states = self.mlp(hidden_states)
+        hidden_states = self.post_attention_layernorm(hidden_states)  # type: ignore
+        hidden_states = self.mlp(hidden_states)  # type: ignore
         if self.training and self.is_training_config:
             predictor_loss = self.compute_predictor_loss(hidden_states)
         else:
@@ -613,4 +613,4 @@ def build_skip_connection_model_for_causal_lm(pretrained_model_class: type[PreTr
 
 
 
-__all__ = [SkipDecoderLayer, SkipMLP, build_skip_connection_model, build_skip_connection_model_for_causal_lm]
+__all__ = [build_skip_connection_model, build_skip_connection_model_for_causal_lm]
