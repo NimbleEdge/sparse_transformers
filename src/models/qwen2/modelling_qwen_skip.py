@@ -7,20 +7,17 @@ from transformers.modeling_attn_mask_utils import AttentionMaskConverter
 from transformers.utils import logging
 from transformers.cache_utils import Cache, SlidingWindowCache, StaticCache
 from transformers.modeling_utils import PreTrainedModel
-
-
-from transformers.models.qwen2.modeling_qwen2 import(
-    Qwen2MLP, Qwen2Attention, Qwen2RMSNorm, Qwen2RotaryEmbedding,
-)
+from transformers.utils.import_utils import is_torch_flex_attn_available
 
 if is_torch_flex_attn_available():
     from torch.nn.attention.flex_attention import BlockMask
 
     from transformers.integrations.flex_attention import make_flex_block_causal_mask
 
-# Import C++ extensions
-from sparse_transformers import (
+from transformers.models.qwen2.modeling_qwen2 import(
+    Qwen2MLP, Qwen2Attention, Qwen2RMSNorm, Qwen2RotaryEmbedding,
 )
+
 
 from src.models.qwen2.configuration_qwen_skip import Qwen2SkipConnectionConfig
 from src.modeling_skip import SkipMLP, SkipDecoderLayer, build_skip_connection_model, build_skip_connection_model_for_causal_lm
@@ -34,7 +31,7 @@ class Qwen2SkipDecoderLayer(SkipDecoderLayer):
         self.input_layernorm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         if config.use_sliding_window and config._attn_implementation != "flash_attention_2":
-            logger.warning_once(
+            logger.warning(
                 f"Sliding Window Attention is enabled but not implemented for `{config._attn_implementation}`; "
                 "unexpected results may be encountered."
             )
@@ -78,7 +75,7 @@ class Qwen2SkipPreTrainedModel(PreTrainedModel):
             module.weight.data.fill_(1.0)
 
 
-Qwen2SkipConnectionModelBase: type[Qwen2SkipPreTrainedModel] = build_skip_connection_model(Qwen2SkipPreTrainedModel)
+Qwen2SkipConnectionModelBase = build_skip_connection_model(Qwen2SkipPreTrainedModel)
 
 class Qwen2SkipConnectionModel(Qwen2SkipConnectionModelBase):
     def _init_components(self, config):

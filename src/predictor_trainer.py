@@ -1,7 +1,6 @@
 import logging
 import os
 from typing import Dict,Optional
-import warnings
 
 import torch
 import torch.nn as nn
@@ -106,7 +105,6 @@ class LayerwisePredictorTrainer:
     def evaluate_predictor(self, 
                           layer_idx: int,
                           dataloader: DataLoader,
-                          k: int,
                           max_batches: int = 50) -> Dict[str, float]:
         """Evaluate predictor performance."""
         self.predictors[layer_idx].eval()

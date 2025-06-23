@@ -1,3 +1,5 @@
+import torch.nn.functional as F
+
 
 class ActivationCapture:
     """Helper class to capture activations from model layers."""

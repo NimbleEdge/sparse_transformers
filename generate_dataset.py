@@ -3,63 +3,78 @@
 Generate training dataset for sparsity predictors.
 
 This script runs a standard LLaMA model on text data and captures:
-- Hidden states before each MLP layer (inputs for predictor)
-- MLP activations (ground truth for what neurons are important)
+- Input text
+- Hidden states for each token before each MLP layer
+- MLP activations for each token at each layer
 
-The data is saved per-layer to be used for training predictors.
+The data is saved with sequence structure preserved for training predictors.
 """
 
 import argparse
 import json
 import logging
 import os
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 import numpy as np
-from pathlib import Path
 import shutil
-import warnings
 
 import torch
-import torch.nn.functional as F
-from torch.utils.data import DataLoader
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
-    set_seed
 )
-from datasets import load_dataset, Dataset, Features, Value, Array2D
+from transformers.trainer_utils import set_seed
+from datasets import load_dataset, Dataset, Features, Value, Array2D, Sequence
+from torch.utils.data import DataLoader
 from tqdm import tqdm
-from src.activatiion_capture import ActivationCapture
-
-# Suppress the specific warning from HuggingFace datasets about torch.tensor()
-warnings.filterwarnings("ignore", message="To copy construct from a tensor, it is recommended to use sourceTensor.detach()", category=UserWarning)
+from src.activation_capture import ActivationCapture
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def create_layer_dataset(hidden_states_list: List[np.ndarray], 
-                        mlp_activations_list: List[np.ndarray],
-                        hidden_dim: int,
-                        intermediate_dim: int) -> Dataset:
-    """Create a HuggingFace dataset from collected activations."""
+def create_layer_dataset(
+    texts_list: List[str],
+    input_ids_list: List[np.ndarray],
+    hidden_states_dict: Dict[int, List[np.ndarray]], 
+    mlp_activations_dict: Dict[int, List[np.ndarray]],
+    num_layers: int,
+    hidden_dim: int,
+    intermediate_dim: int,
+    max_length: int
+) -> Dataset:
+    """Create a HuggingFace dataset from collected activations with sequence structure."""
     
-    # Concatenate all batches
-    all_hidden_states = np.concatenate(hidden_states_list, axis=0)
-    all_mlp_activations = np.concatenate(mlp_activations_list, axis=0)
-    
-    # Create dataset dict
+    # Prepare data for dataset
     dataset_dict = {
-        "hidden_states": all_hidden_states,
-        "mlp_activations": all_mlp_activations
+        "text": texts_list,
+        "input_ids": input_ids_list,
     }
     
-    # Define features
-    features = Features({
-        "hidden_states": Array2D(shape=(hidden_dim,), dtype="float32"),
-        "mlp_activations": Array2D(shape=(intermediate_dim,), dtype="float32")
-    })
+    # Add hidden states and activations for each layer
+    for layer_idx in range(num_layers):
+        if layer_idx in hidden_states_dict:
+            dataset_dict[f"hidden_states_layer_{layer_idx}"] = hidden_states_dict[layer_idx]
+            dataset_dict[f"mlp_activations_layer_{layer_idx}"] = mlp_activations_dict[layer_idx]
+    
+    # Define features with proper shapes
+    features_dict = {
+        "text": Value("string"),
+        "input_ids": Sequence(feature=Value("int32"), length=max_length),
+    }
+    
+    # Add features for each layer
+    for layer_idx in range(num_layers):
+        if f"hidden_states_layer_{layer_idx}" in dataset_dict:
+            features_dict[f"hidden_states_layer_{layer_idx}"] = Array2D(
+                shape=(max_length, hidden_dim), dtype="float32"
+            )
+            features_dict[f"mlp_activations_layer_{layer_idx}"] = Array2D(
+                shape=(max_length, intermediate_dim), dtype="float32"
+            )
+    
+    features = Features(features_dict)
     
     # Create dataset
     dataset = Dataset.from_dict(dataset_dict, features=features)
@@ -67,19 +82,72 @@ def create_layer_dataset(hidden_states_list: List[np.ndarray],
     return dataset
 
 
+def process_batch(
+    tokenized_batch: Dict[str, torch.Tensor],
+    model,
+    capture: ActivationCapture,
+    device: torch.device,
+    num_layers: int
+) -> Tuple[List[np.ndarray], Dict[int, List[np.ndarray]], Dict[int, List[np.ndarray]]]:
+    """Process a batch of texts and return all activations."""
+    
+    # Move to device
+    input_ids = tokenized_batch["input_ids"].to(device)
+    attention_mask = tokenized_batch["attention_mask"].to(device)
+    
+    # Clear previous captures
+    capture.clear_captures()
+    
+    # Forward pass
+    with torch.no_grad():
+        _ = model(input_ids=input_ids, attention_mask=attention_mask)
+    
+    # Pre-allocate arrays for efficiency
+    batch_size = input_ids.shape[0]
+    input_ids_list = []
+    hidden_states_dict = {i: [] for i in range(num_layers)}
+    mlp_activations_dict = {i: [] for i in range(num_layers)}
+    
+    # Vectorized extraction of data for all samples in batch
+    input_ids_np = input_ids.cpu().numpy().astype(np.int32)
+    attention_mask_np = attention_mask.cpu().numpy().astype(np.int8)
+    
+    for batch_idx in range(batch_size):
+        # Get sequence length from attention mask
+        seq_len = attention_mask_np[batch_idx].sum()
+        # Only append the non-padded tokens
+        input_ids_list.append(input_ids_np[batch_idx][:seq_len])
+        
+        # Collect activations for each layer
+        for layer_idx in range(num_layers):
+            if layer_idx in capture.hidden_states:
+                # Extract hidden states and activations for this sample
+                # Using direct indexing instead of view operations
+                hidden_state = capture.hidden_states[layer_idx][batch_idx].cpu().numpy().astype(np.float32)
+                mlp_activation = capture.get_mlp_activations(layer_idx)
+                if mlp_activation is not None:
+                    mlp_act = mlp_activation[batch_idx].cpu().numpy().astype(np.float32)
+                    
+                    hidden_states_dict[layer_idx].append(hidden_state[:seq_len, :])
+                    mlp_activations_dict[layer_idx].append(mlp_act[:seq_len, :])
+    
+    return input_ids_list, hidden_states_dict, mlp_activations_dict
+
+
 def generate_dataset(
     model_name: str,
     dataset_name: str,
     dataset_config: Optional[str],
     output_dir: str,
-    num_samples: int,
     max_length: int,
     batch_size: int,
-    seed: int,
     device: torch.device,
-    save_interval: int = 10000
+    save_interval: int = 1000,
+    num_workers: int = 4,
+    prefetch_batches: int = 2,
+    max_samples: int = 100000
 ):
-    """Generate predictor training dataset."""
+    """Generate predictor training dataset with optimizations."""
     
     # Create output directory
     os.makedirs(output_dir, exist_ok=True)
@@ -91,7 +159,7 @@ def generate_dataset(
     
     model = AutoModelForCausalLM.from_pretrained(
         model_name,
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float32,
         device_map="auto" if device.type == "cuda" else None
     )
     
@@ -110,148 +178,131 @@ def generate_dataset(
     capture.register_hooks(model)
     
     # Load dataset
+
     logger.info(f"Loading dataset: {dataset_name}")
     if dataset_config:
-        dataset = load_dataset(dataset_name, dataset_config, split="train")
+        raw_dataset = load_dataset(dataset_name, dataset_config, split="train", streaming=False)
     else:
-        dataset = load_dataset(dataset_name, split="train")
-    
-    # Tokenize function
+        raw_dataset = load_dataset(dataset_name, split="train", streaming=False)
+
     def tokenize_function(examples):
-        return tokenizer(
-            examples["text"],
-            padding="max_length",
-            truncation=True,
-            max_length=max_length,
-            return_tensors="pt"
-        )
-    
-    # Process dataset
-    dataset = dataset.map(tokenize_function, batched=True)
+        return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=max_length)
+    num_samples = min(max_samples, len(raw_dataset))
+    dataset = raw_dataset.take(num_samples).map(tokenize_function, batched=True)
     dataset = dataset.with_format("torch")
+    dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=1) # type: ignore
+    # Storage for collected data
+    texts_list = []
+    input_ids_list = []
+    hidden_states_dict = {i: [] for i in range(num_layers)}
+    mlp_activations_dict = {i: [] for i in range(num_layers)}
     
-    # Create data loader
-    dataloader = DataLoader(
-        dataset.take(num_samples),
-        batch_size=batch_size,
-        num_workers=4 if device.type == "cuda" else 0,
-        pin_memory=True if device.type == "cuda" else False
-    )
+    # Process samples
+    logger.info(f"Using batch size: {batch_size}")
     
-    # Initialize storage for each layer
-    layer_data = {
-        i: {
-            "hidden_states": [],
-            "mlp_activations": []
-        } for i in range(num_layers)
-    }
-    
-    # Process batches
-    logger.info(f"Processing {num_samples} samples...")
-    samples_processed = 0
-    
+    # Process in larger batches for efficiency
     with torch.no_grad():
-        for batch_idx, batch in enumerate(tqdm(dataloader, desc="Generating dataset")):
-            if samples_processed >= num_samples:
-                break
-                
-            # Move batch to device
-            input_ids = batch["input_ids"].to(device)
-            attention_mask = batch["attention_mask"].to(device)
+        # Process samples in batches
+        for batch in tqdm(dataloader, desc="Processing batches", total=num_samples//batch_size): # type: ignore            
+            # Process batch
+            input_ids_list_, hidden_states_dict_, mlp_activations_dict_ = process_batch(
+                batch, model, capture, device, num_layers
+            )
             
-            # Clear previous captures
-            capture.clear_captures()
+            # Extend lists with batch results
+            texts_list.extend(batch["text"])
+            input_ids_list.extend(input_ids_list_)
             
-            # Forward pass
-            outputs = model(input_ids=input_ids, attention_mask=attention_mask)
-            
-            # Collect activations for each layer
+            # Extend layer dictionaries
             for layer_idx in range(num_layers):
-                if layer_idx in capture.hidden_states:
-                    hidden_state = capture.hidden_states[layer_idx].detach().clone().cpu()
-                    mlp_activation = capture.get_mlp_activations(layer_idx).detach().clone().cpu()
-                    
-                    if mlp_activation is not None:
-                        # Store flattened versions for training
-                        # Shape: [batch_size * seq_len, hidden_dim]
-                        hidden_flat = hidden_state.view(-1, hidden_state.shape[-1])
-                        mlp_flat = mlp_activation.view(-1, mlp_activation.shape[-1])
-                        attention_flat = attention_mask.view(-1).cpu()
+                if layer_idx in hidden_states_dict:
+                    hidden_states_dict[layer_idx].extend(hidden_states_dict_[layer_idx])
+                    mlp_activations_dict[layer_idx].extend(mlp_activations_dict_[layer_idx])
                         
-                        # Only keep non-padded positions
-                        valid_mask = attention_flat > 0
-                        
-                        # Convert to numpy for HuggingFace datasets
-                        layer_data[layer_idx]["hidden_states"].append(
-                            hidden_flat[valid_mask].numpy().astype(np.float32)
-                        )
-                        layer_data[layer_idx]["mlp_activations"].append(
-                            mlp_flat[valid_mask].numpy().astype(np.float32)
-                        )
-            
-            samples_processed += batch_size
-            
             # Save intermediate results periodically
-            if samples_processed % save_interval == 0:
-                logger.info(f"Saving intermediate results at {samples_processed} samples...")
-                save_datasets(layer_data, output_dir, num_layers, hidden_dim, 
-                            intermediate_dim, intermediate=True)
+            if len(texts_list) % save_interval == 0 and len(texts_list) > 0:
+                logger.info(f"Saving intermediate results at {len(texts_list)} samples...")
+                save_dataset(
+                    texts_list, input_ids_list,
+                    hidden_states_dict, mlp_activations_dict,
+                    output_dir, num_layers, hidden_dim, intermediate_dim,
+                    max_length, intermediate=True
+                )
     
     # Remove hooks
     capture.remove_hooks()
     
-    # Save final datasets
-    logger.info("Saving final datasets...")
-    save_datasets(layer_data, output_dir, num_layers, hidden_dim, 
-                intermediate_dim, intermediate=False)
+    # Save final dataset
+    logger.info("Saving final dataset...")
+    save_dataset(
+        texts_list, input_ids_list,
+        hidden_states_dict, mlp_activations_dict,
+        output_dir, num_layers, hidden_dim, intermediate_dim,
+        max_length, intermediate=False
+    )
     
     # Save metadata
     metadata = {
         "model_name": model_name,
         "dataset_name": dataset_name,
         "dataset_config": dataset_config,
-        "num_samples": samples_processed,
+        "num_samples": len(texts_list),
         "max_length": max_length,
         "num_layers": num_layers,
         "hidden_dim": hidden_dim,
-        "intermediate_dim": intermediate_dim
+        "intermediate_dim": intermediate_dim,
+        "batch_size": batch_size,
     }
     
     with open(os.path.join(output_dir, "metadata.json"), "w") as f:
         json.dump(metadata, f, indent=2)
     
-    logger.info(f"Dataset generation complete. Processed {samples_processed} samples.")
+    logger.info(f"Dataset generation complete. Processed {len(texts_list)} samples.")
 
 
-def save_datasets(layer_data: Dict, output_dir: str, num_layers: int,
-                 hidden_dim: int, intermediate_dim: int, intermediate: bool = False):
-    """Save layer datasets in HuggingFace format."""
+def save_dataset(
+    texts_list: List[str],
+    input_ids_list: List[np.ndarray],
+    hidden_states_dict: Dict[int, List[np.ndarray]],
+    mlp_activations_dict: Dict[int, List[np.ndarray]],
+    output_dir: str,
+    num_layers: int,
+    hidden_dim: int,
+    intermediate_dim: int,
+    max_length: int,
+    intermediate: bool = False
+):
+    """Save dataset in HuggingFace format."""
     
-    for layer_idx in range(num_layers):
-        if layer_data[layer_idx]["hidden_states"]:
-            # Create dataset for this layer
-            dataset = create_layer_dataset(
-                layer_data[layer_idx]["hidden_states"],
-                layer_data[layer_idx]["mlp_activations"],
-                hidden_dim,
-                intermediate_dim
-            )
-            
-            # Save path
-            layer_dir = os.path.join(output_dir, f"layer_{layer_idx}")
-            if intermediate:
-                save_path = os.path.join(layer_dir, "intermediate")
-            else:
-                save_path = layer_dir
-            
-            # Save dataset in Arrow format (efficient for large datasets)
-            dataset.save_to_disk(save_path)
-            
-            logger.info(f"Saved layer {layer_idx}: {len(dataset)} samples to {save_path}")
-            
-            # If this is the final save and intermediate exists, remove it
-            if not intermediate and os.path.exists(os.path.join(layer_dir, "intermediate")):
-                shutil.rmtree(os.path.join(layer_dir, "intermediate"))
+    if not texts_list:
+        logger.warning("No data to save")
+        return
+    
+    # Create dataset
+    dataset = create_layer_dataset(
+        texts_list, input_ids_list,
+        hidden_states_dict, mlp_activations_dict,
+        num_layers, hidden_dim, intermediate_dim, max_length
+    )
+    
+    # Save path
+    if intermediate:
+        save_path = os.path.join(output_dir, "intermediate")
+    else:
+        save_path = output_dir
+    
+    # Save dataset in Arrow format with optimal settings
+    dataset.save_to_disk(
+        save_path,
+        num_shards=4,  # Split into multiple files for faster I/O
+        num_proc=4     # Use multiple processes for saving
+    )
+    
+    logger.info(f"Saved dataset: {len(dataset)} samples to {save_path}")
+    
+    # If this is the final save and intermediate exists, remove it
+    if not intermediate and os.path.exists(os.path.join(output_dir, "intermediate")):
+        shutil.rmtree(os.path.join(output_dir, "intermediate"))
 
 
 def main():
@@ -264,14 +315,18 @@ def main():
                        help="Dataset configuration (e.g., realnewslike for C4)")
     parser.add_argument("--output_dir", type=str, required=True,
                        help="Output directory for generated dataset")
-    parser.add_argument("--num_samples", type=int, default=50000,
-                       help="Number of samples to process")
-    parser.add_argument("--max_length", type=int, default=8192,
+    parser.add_argument("--max_length", type=int, default=2048,
                        help="Maximum sequence length")
-    parser.add_argument("--batch_size", type=int, default=8,
+    parser.add_argument("--max_samples", type=int, default=100000,
+                       help="Maximum number of samples to process")
+    parser.add_argument("--batch_size", type=int, default=4,
                        help="Batch size for processing")
-    parser.add_argument("--save_interval", type=int, default=10000,
+    parser.add_argument("--save_interval", type=int, default=1000,
                        help="Save intermediate results every N samples")
+    parser.add_argument("--num_workers", type=int, default=4,
+                       help="Number of workers for data loading")
+    parser.add_argument("--prefetch_batches", type=int, default=2,
+                       help="Number of batches to prefetch")
     parser.add_argument("--seed", type=int, default=42,
                        help="Random seed")
     parser.add_argument("--device", type=str, default="auto",
@@ -290,18 +345,23 @@ def main():
     
     logger.info(f"Using device: {device}")
     
+    # Set number of threads for CPU operations
+    if device.type == "cpu":
+        torch.set_num_threads(args.num_workers)
+    
     # Generate dataset
     generate_dataset(
         model_name=args.model_name,
         dataset_name=args.dataset,
         dataset_config=args.dataset_config,
         output_dir=args.output_dir,
-        num_samples=args.num_samples,
         max_length=args.max_length,
         batch_size=args.batch_size,
-        seed=args.seed,
         device=device,
-        save_interval=args.save_interval
+        save_interval=args.save_interval,
+        num_workers=args.num_workers,
+        prefetch_batches=args.prefetch_batches,
+        max_samples=args.max_samples
     )
 
 

@@ -13,72 +13,18 @@ from transformers.modeling_attn_mask_utils import AttentionMaskConverter
 from transformers.utils import logging
 from transformers.cache_utils import Cache
 from transformers.modeling_utils import PreTrainedModel
+from transformers.utils.import_utils import is_torch_flex_attn_available
 
-# Import C++ extensions
-from sparse_transformers import (
-    sparse_mlp_forward,
-    WeightCache,
-)
+if is_torch_flex_attn_available():
+    from torch.nn.attention.flex_attention import BlockMask
+
+    from transformers.integrations.flex_attention import make_flex_block_causal_mask
+
 
 from src.models.llama.configuration_llama_skip import LlamaSkipConnectionConfig
 from src.modeling_skip import SkipMLP, SkipDecoderLayer, build_skip_connection_model, build_skip_connection_model_for_causal_lm
 
 logger = logging.get_logger(__name__)
-
-                     
-class LlamaSkipMLP(nn.Module):
-    def __init__(self, hidden_size: int, intermediate_size: int, sparsity: float, bias: bool = False):
-        super().__init__()
-        self.gate_proj = nn.Linear(hidden_size, intermediate_size, bias=bias)
-        self.up_proj = nn.Linear(hidden_size, intermediate_size, bias=bias)
-        self.down_proj = nn.Linear(intermediate_size, hidden_size, bias=bias)
-        self.sparsity = sparsity
-        self.hidden_size = hidden_size
-        self.intermediate_size = intermediate_size
-        
-        # Initialize mask but defer WeightCache creation until post_init
-        self.init_mask = torch.ones(intermediate_size, dtype=torch.bool)
-        self.init_mask[int(intermediate_size * sparsity):] = 0
-        
-        self.weight_cache = None
-
-        # Register buffers - start with reasonable size and ensure they can be resized
-        self.register_buffer('down_proj_buffer', torch.zeros(1, hidden_size, requires_grad=False))
-        self.register_buffer('combined_proj_buffer', torch.zeros(1, 2 * int(intermediate_size * sparsity), requires_grad=False))
-
-    def initialize_weight_cache(self):
-        """Tie weights after weights are loaded (called from post_init)."""
-        if self.weight_cache is None:
-            # Create and initialize weight cache
-            self.weight_cache = WeightCache(   
-                self.init_mask,
-                self.hidden_size,
-                self.gate_proj.weight,
-                self.up_proj.weight, 
-                self.down_proj.weight
-            )
-
-    def to(self, *args, **kwargs):
-        # Move buffers to same device as model when .to() is called
-        result = super().to(*args, **kwargs)
-        device = args[0] if args else kwargs.get('device')
-        if device:
-            self.down_proj_buffer = self.down_proj_buffer.to(device)
-            self.combined_proj_buffer = self.combined_proj_buffer.to(device)
-            if hasattr(self, 'init_mask'):
-                self.init_mask = self.init_mask.to(device)
-        return result
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = sparse_mlp_forward(
-            x.detach(), 
-            self.weight_cache.get_concat_weight(), # type: ignore
-            self.weight_cache.get_active_down_weight(), # type: ignore
-            self.down_proj_buffer,
-            self.combined_proj_buffer,
-            "silu"
-        )
-        return out
 
 class LlamaSkipRMSNorm(nn.Module):
     def __init__(self, hidden_size, eps=1e-5):

@@ -87,6 +87,7 @@ coverage.xml
 # Logs and databases
 *.sqlite
 *.db
+data/
 
 # OS generated files
 .DS_Store

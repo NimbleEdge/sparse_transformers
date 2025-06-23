@@ -13,17 +13,13 @@ from transformers.models.mistral.modeling_mistral import(
     MistralMLP, MistralAttention, MistralRMSNorm, MistralRotaryEmbedding,
 )
 
+from transformers.utils.import_utils import is_torch_flex_attn_available
+
 if is_torch_flex_attn_available():
     from torch.nn.attention.flex_attention import BlockMask
 
     from transformers.integrations.flex_attention import make_flex_block_causal_mask
 
-# Import C++ extensions
-from sparse_transformers import (
-    sparse_mlp_forward,
-    WeightCache,
-    approx_topk_threshold
-)
 
 from src.models.mistral.configuration_mistral_skip import MistralSkipConnectionConfig
 from src.modeling_skip import SkipMLP, SkipDecoderLayer, build_skip_connection_model, build_skip_connection_model_for_causal_lm
@@ -76,7 +72,7 @@ class MistralSkipPreTrainedModel(PreTrainedModel):
             module.weight.data.fill_(1.0)
 
 
-MistralSkipConnectionModelBase: type[MistralSkipPreTrainedModel] = build_skip_connection_model(MistralSkipPreTrainedModel)
+MistralSkipConnectionModelBase = build_skip_connection_model(MistralSkipPreTrainedModel)
 
 class MistralSkipConnectionModel(MistralSkipConnectionModelBase):
     def _init_components(self, config):

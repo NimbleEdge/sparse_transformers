@@ -5,32 +5,26 @@ from typing import Optional, Tuple, Union
 import torch
 from torch import nn
 
-from transformers.modeling_outputs import (
-    CausalLMOutputWithPast
-)
-
 from transformers.modeling_attn_mask_utils import AttentionMaskConverter
 from transformers.processing_utils import Unpack
 from transformers.utils import logging
 from transformers.cache_utils import Cache, SlidingWindowCache, StaticCache
 from transformers.modeling_utils import PreTrainedModel
-
+from transformers.modeling_flash_attention_utils import FlashAttentionKwargs
 
 from transformers.models.phi3.modeling_phi3 import(
     Phi3MLP, Phi3Attention, Phi3RMSNorm, Phi3RotaryEmbedding,
 )
+
+from transformers.utils.import_utils import is_torch_flex_attn_available
 
 if is_torch_flex_attn_available():
     from torch.nn.attention.flex_attention import BlockMask
 
     from transformers.integrations.flex_attention import make_flex_block_causal_mask
 
-# Import C++ extensions
-from sparse_transformers import (
-)
-
 from src.models.phi3.configuration_phi_skip import Phi3SkipConnectionConfig
-from src.modeling_skip import SkipMLP, SkipDecoderLayer, build_skip_connection_model, build_skip_connection_model_for_causal_lm
+from src.modeling_skip import SkipMLP, SkipDecoderLayer, FastLoRAProjection, build_skip_connection_model, build_skip_connection_model_for_causal_lm
 
 logger = logging.get_logger(__name__)
 
@@ -164,7 +158,7 @@ class Phi3SkipPreTrainedModel(PreTrainedModel):
         elif isinstance(module, Phi3RMSNorm):
             module.weight.data.fill_(1.0)
 
-Phi3SkipConnectionModelBase: type[Phi3SkipPreTrainedModel] = build_skip_connection_model(Phi3SkipPreTrainedModel)
+Phi3SkipConnectionModelBase = build_skip_connection_model(Phi3SkipPreTrainedModel)
 
 class Phi3SkipConnectionModel(Phi3SkipConnectionModelBase):
     def _init_components(self, config):
