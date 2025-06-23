@@ -42,14 +42,16 @@ class ActivationCapture:
         def hook(module, args, kwargs, output):
             # args[0] is the input hidden states to the layer
             if len(args) > 0:
-                self.hidden_states[layer_idx] = args[0].detach().clone().cpu()
+                # Just detach, don't clone or move to CPU yet
+                self.hidden_states[layer_idx] = args[0].detach()
             return output
         return hook
     
     def _create_mlp_hook(self, layer_idx, proj_type):
         def hook(module, input, output):
             key = f"{layer_idx}_{proj_type}"
-            self.mlp_activations[key] = output.detach().clone().cpu()
+            # Just detach, don't clone or move to CPU yet
+            self.mlp_activations[key] = output.detach()
             return output
         return hook
     

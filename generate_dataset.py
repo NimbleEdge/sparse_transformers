@@ -17,6 +17,7 @@ import os
 from typing import Dict, List, Optional, Tuple
 import numpy as np
 import shutil
+import random
 
 import torch
 from transformers import (
@@ -95,8 +96,10 @@ def process_batch(
     input_ids = tokenized_batch["input_ids"].to(device)
     attention_mask = tokenized_batch["attention_mask"].to(device)
     
-    # Clear previous captures
+    # Clear previous captures and GPU cache
     capture.clear_captures()
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
     
     # Forward pass
     with torch.no_grad():
@@ -108,28 +111,35 @@ def process_batch(
     hidden_states_dict = {i: [] for i in range(num_layers)}
     mlp_activations_dict = {i: [] for i in range(num_layers)}
     
-    # Vectorized extraction of data for all samples in batch
-    input_ids_np = input_ids.cpu().numpy().astype(np.int32)
+    # Move attention mask to CPU once
     attention_mask_np = attention_mask.cpu().numpy().astype(np.int8)
     
+    # Process each sample in the batch
     for batch_idx in range(batch_size):
         # Get sequence length from attention mask
-        seq_len = attention_mask_np[batch_idx].sum()
-        # Only append the non-padded tokens
-        input_ids_list.append(input_ids_np[batch_idx][:seq_len])
+        seq_len = int(attention_mask_np[batch_idx].sum())
+        
+        # Extract input_ids for this sample
+        input_ids_sample = input_ids[batch_idx, :seq_len].cpu().numpy().astype(np.int32)
+        input_ids_list.append(input_ids_sample)
         
         # Collect activations for each layer
         for layer_idx in range(num_layers):
             if layer_idx in capture.hidden_states:
-                # Extract hidden states and activations for this sample
-                # Using direct indexing instead of view operations
-                hidden_state = capture.hidden_states[layer_idx][batch_idx].cpu().numpy().astype(np.float32)
+                # Move only the needed slice to CPU
+                hidden_state = capture.hidden_states[layer_idx][batch_idx, :seq_len, :].cpu().numpy().astype(np.float32)
+                hidden_states_dict[layer_idx].append(hidden_state)
+                
+                # Get MLP activations
                 mlp_activation = capture.get_mlp_activations(layer_idx)
                 if mlp_activation is not None:
-                    mlp_act = mlp_activation[batch_idx].cpu().numpy().astype(np.float32)
-                    
-                    hidden_states_dict[layer_idx].append(hidden_state[:seq_len, :])
-                    mlp_activations_dict[layer_idx].append(mlp_act[:seq_len, :])
+                    mlp_act = mlp_activation[batch_idx, :seq_len, :].cpu().numpy().astype(np.float32)
+                    mlp_activations_dict[layer_idx].append(mlp_act)
+    
+    # Clear GPU tensors from capture to free memory
+    capture.clear_captures()
+    if device.type == "cuda":
+        torch.cuda.empty_cache()
     
     return input_ids_list, hidden_states_dict, mlp_activations_dict
 
@@ -178,19 +188,81 @@ def generate_dataset(
     capture.register_hooks(model)
     
     # Load dataset
-
     logger.info(f"Loading dataset: {dataset_name}")
     if dataset_config:
         raw_dataset = load_dataset(dataset_name, dataset_config, split="train", streaming=False)
     else:
         raw_dataset = load_dataset(dataset_name, split="train", streaming=False)
+    
+    # Ensure we have a Dataset object (not DatasetDict)
+    if hasattr(raw_dataset, '__getitem__'):
+        dataset = raw_dataset  # type: ignore
+    else:
+        raise ValueError("Expected a Dataset object, got: " + type(raw_dataset).__name__)
 
-    def tokenize_function(examples):
-        return tokenizer(examples["text"], padding="max_length", truncation=True, max_length=max_length)
-    num_samples = min(max_samples, len(raw_dataset))
-    dataset = raw_dataset.take(num_samples).map(tokenize_function, batched=True)
+    def sample_and_tokenize(examples):
+        """Sample text chunks before tokenization for efficiency using vectorized operations."""
+        texts = examples["text"]
+        chars_per_token = 4
+        target_chars = max_length * chars_per_token * 2
+        
+        # Vectorized length calculation
+        text_lengths = np.array([len(text) for text in texts])
+        
+        # Process all texts
+        sampled_texts = []
+        for idx in range(len(texts)):
+            text = texts[idx]
+            text_len = text_lengths[idx]
+            
+            if text_len > target_chars:
+                # Vectorized random sampling
+                max_start = text_len - target_chars
+                start_idx = np.random.randint(0, max_start + 1)
+                
+                # Simple word boundary adjustment (simplified for speed)
+                # Find space before start_idx
+                space_before = text.rfind(' ', 0, start_idx + 1)
+                start_idx = space_before + 1 if space_before != -1 else start_idx
+                
+                # Find space after end_idx
+                end_idx = min(int(start_idx + target_chars), int(text_len))
+                space_after = text.find(' ', end_idx - 1)
+                end_idx = space_after if space_after != -1 else end_idx
+                
+                sampled_texts.append(text[start_idx:end_idx].strip())
+            else:
+                sampled_texts.append(text)
+        
+        # Batch tokenization - much faster than individual tokenization
+        if not sampled_texts:
+            return {"text": [], "input_ids": [], "attention_mask": []}
+            
+        tokenized = tokenizer(
+            sampled_texts,
+            padding="max_length",
+            truncation=True,
+            max_length=max_length,
+            return_tensors="pt"  # Return numpy arrays for faster operations
+        )
+        
+        # Convert to lists
+        return {
+            "text": sampled_texts,
+            "input_ids": tokenized["input_ids"],
+            "attention_mask": tokenized["attention_mask"]
+        }
+        
+    num_samples = min(max_samples, len(dataset))
+    logger.info(f"Processing {num_samples} samples from dataset")
+    
+    # Select subset and tokenize
+    dataset = dataset.select(range(num_samples))
+    dataset = dataset.map(sample_and_tokenize, batched=True)
     dataset = dataset.with_format("torch")
-    dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=1) # type: ignore
+    
+    # Create DataLoader with num_workers=0 to avoid shared memory issues
+    dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=0, pin_memory=False)
     # Storage for collected data
     texts_list = []
     input_ids_list = []
@@ -203,7 +275,7 @@ def generate_dataset(
     # Process in larger batches for efficiency
     with torch.no_grad():
         # Process samples in batches
-        for batch in tqdm(dataloader, desc="Processing batches", total=num_samples//batch_size): # type: ignore            
+        for batch in tqdm(dataloader, desc="Processing batches", total=len(dataloader)):            
             # Process batch
             input_ids_list_, hidden_states_dict_, mlp_activations_dict_ = process_batch(
                 batch, model, capture, device, num_layers
@@ -315,7 +387,7 @@ def main():
                        help="Dataset configuration (e.g., realnewslike for C4)")
     parser.add_argument("--output_dir", type=str, required=True,
                        help="Output directory for generated dataset")
-    parser.add_argument("--max_length", type=int, default=2048,
+    parser.add_argument("--max_length", type=int, default=256,
                        help="Maximum sequence length")
     parser.add_argument("--max_samples", type=int, default=100000,
                        help="Maximum number of samples to process")
