@@ -25,7 +25,7 @@ from transformers import (
     AutoModelForCausalLM,
 )
 from transformers.trainer_utils import set_seed
-from datasets import load_dataset, Dataset, Features, Value, Array2D, Sequence
+from datasets import load_dataset, Dataset, Features, Value, Array2D, Sequence, load_from_disk, concatenate_datasets
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from src.activation_capture import ActivationCapture
@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 def create_layer_dataset(
     texts_list: List[str],
     input_ids_list: List[np.ndarray],
+    attention_mask_list: List[np.ndarray],
     hidden_states_dict: Dict[int, List[np.ndarray]], 
     mlp_activations_dict: Dict[int, List[np.ndarray]],
     num_layers: int,
@@ -47,10 +48,11 @@ def create_layer_dataset(
 ) -> Dataset:
     """Create a HuggingFace dataset from collected activations with sequence structure."""
     
-    # Prepare data for dataset
+    # Prepare data for dataset without fixed features
     dataset_dict = {
         "text": texts_list,
         "input_ids": input_ids_list,
+        "attention_mask": attention_mask_list,
     }
     
     # Add hidden states and activations for each layer
@@ -59,26 +61,8 @@ def create_layer_dataset(
             dataset_dict[f"hidden_states_layer_{layer_idx}"] = hidden_states_dict[layer_idx]
             dataset_dict[f"mlp_activations_layer_{layer_idx}"] = mlp_activations_dict[layer_idx]
     
-    # Define features with proper shapes
-    features_dict = {
-        "text": Value("string"),
-        "input_ids": Sequence(feature=Value("int32"), length=max_length),
-    }
-    
-    # Add features for each layer
-    for layer_idx in range(num_layers):
-        if f"hidden_states_layer_{layer_idx}" in dataset_dict:
-            features_dict[f"hidden_states_layer_{layer_idx}"] = Array2D(
-                shape=(max_length, hidden_dim), dtype="float32"
-            )
-            features_dict[f"mlp_activations_layer_{layer_idx}"] = Array2D(
-                shape=(max_length, intermediate_dim), dtype="float32"
-            )
-    
-    features = Features(features_dict)
-    
-    # Create dataset
-    dataset = Dataset.from_dict(dataset_dict, features=features)
+    # Create dataset without specifying fixed-length features
+    dataset = Dataset.from_dict(dataset_dict)
     
     return dataset
 
@@ -89,7 +73,7 @@ def process_batch(
     capture: ActivationCapture,
     device: torch.device,
     num_layers: int
-) -> Tuple[List[np.ndarray], Dict[int, List[np.ndarray]], Dict[int, List[np.ndarray]]]:
+) -> Tuple[List[np.ndarray], List[np.ndarray], Dict[int, List[np.ndarray]], Dict[int, List[np.ndarray]]]:
     """Process a batch of texts and return all activations."""
     
     # Move to device
@@ -110,30 +94,31 @@ def process_batch(
     input_ids_list = []
     hidden_states_dict = {i: [] for i in range(num_layers)}
     mlp_activations_dict = {i: [] for i in range(num_layers)}
-    
+    attention_mask_list = []
     # Move attention mask to CPU once
     attention_mask_np = attention_mask.cpu().numpy().astype(np.int8)
     
     # Process each sample in the batch
     for batch_idx in range(batch_size):
         # Get sequence length from attention mask
-        seq_len = int(attention_mask_np[batch_idx].sum())
+        # seq_len = int(attention_mask_np[batch_idx].sum())
         
         # Extract input_ids for this sample
-        input_ids_sample = input_ids[batch_idx, :seq_len].cpu().numpy().astype(np.int32)
+        input_ids_sample = input_ids[batch_idx].cpu().numpy().astype(np.int32)
         input_ids_list.append(input_ids_sample)
+        attention_mask_list.append(attention_mask_np[batch_idx])
         
         # Collect activations for each layer
         for layer_idx in range(num_layers):
             if layer_idx in capture.hidden_states:
                 # Move only the needed slice to CPU
-                hidden_state = capture.hidden_states[layer_idx][batch_idx, :seq_len, :].cpu().numpy().astype(np.float32)
+                hidden_state = capture.hidden_states[layer_idx][batch_idx].cpu().numpy().astype(np.float32)
                 hidden_states_dict[layer_idx].append(hidden_state)
                 
                 # Get MLP activations
                 mlp_activation = capture.get_mlp_activations(layer_idx)
                 if mlp_activation is not None:
-                    mlp_act = mlp_activation[batch_idx, :seq_len, :].cpu().numpy().astype(np.float32)
+                    mlp_act = mlp_activation[batch_idx].cpu().numpy().astype(np.float32)
                     mlp_activations_dict[layer_idx].append(mlp_act)
     
     # Clear GPU tensors from capture to free memory
@@ -141,7 +126,7 @@ def process_batch(
     if device.type == "cuda":
         torch.cuda.empty_cache()
     
-    return input_ids_list, hidden_states_dict, mlp_activations_dict
+    return input_ids_list, attention_mask_list, hidden_states_dict, mlp_activations_dict
 
 
 def generate_dataset(
@@ -195,8 +180,9 @@ def generate_dataset(
         raw_dataset = load_dataset(dataset_name, split="train", streaming=False)
     
     # Ensure we have a Dataset object (not DatasetDict)
-    if hasattr(raw_dataset, '__getitem__'):
-        dataset = raw_dataset  # type: ignore
+    from datasets import Dataset as HFDataset
+    if isinstance(raw_dataset, HFDataset):
+        dataset = raw_dataset
     else:
         raise ValueError("Expected a Dataset object, got: " + type(raw_dataset).__name__)
 
@@ -262,13 +248,14 @@ def generate_dataset(
     dataset = dataset.with_format("torch")
     
     # Create DataLoader with num_workers=0 to avoid shared memory issues
-    dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=0, pin_memory=False)
+    from torch.utils.data import DataLoader as TorchDataLoader
+    dataloader = TorchDataLoader(dataset, batch_size=batch_size, num_workers=0, pin_memory=False)  # type: ignore
     # Storage for collected data
     texts_list = []
     input_ids_list = []
     hidden_states_dict = {i: [] for i in range(num_layers)}
     mlp_activations_dict = {i: [] for i in range(num_layers)}
-    
+    attention_mask_list = []
     # Process samples
     logger.info(f"Using batch size: {batch_size}")
     
@@ -277,14 +264,14 @@ def generate_dataset(
         # Process samples in batches
         for batch in tqdm(dataloader, desc="Processing batches", total=len(dataloader)):            
             # Process batch
-            input_ids_list_, hidden_states_dict_, mlp_activations_dict_ = process_batch(
+            input_ids_list_, attention_mask_list_, hidden_states_dict_, mlp_activations_dict_ = process_batch(
                 batch, model, capture, device, num_layers
             )
             
             # Extend lists with batch results
             texts_list.extend(batch["text"])
             input_ids_list.extend(input_ids_list_)
-            
+            attention_mask_list.extend(attention_mask_list_)
             # Extend layer dictionaries
             for layer_idx in range(num_layers):
                 if layer_idx in hidden_states_dict:
@@ -295,30 +282,62 @@ def generate_dataset(
             if len(texts_list) % save_interval == 0 and len(texts_list) > 0:
                 logger.info(f"Saving intermediate results at {len(texts_list)} samples...")
                 save_dataset(
-                    texts_list, input_ids_list,
+                    texts_list, input_ids_list, attention_mask_list,
                     hidden_states_dict, mlp_activations_dict,
                     output_dir, num_layers, hidden_dim, intermediate_dim,
-                    max_length, intermediate=True
+                    max_length, intermediate=False  # Save directly to main dataset
                 )
+                
+                # Clear accumulated data after saving to avoid re-processing
+                texts_list.clear()
+                input_ids_list.clear()
+                attention_mask_list.clear()
+                for layer_idx in range(num_layers):
+                    if layer_idx in hidden_states_dict:
+                        hidden_states_dict[layer_idx].clear()
+                        mlp_activations_dict[layer_idx].clear()
+                logger.info("Cleared accumulated data after save")
     
     # Remove hooks
     capture.remove_hooks()
     
-    # Save final dataset
-    logger.info("Saving final dataset...")
-    save_dataset(
-        texts_list, input_ids_list,
-        hidden_states_dict, mlp_activations_dict,
-        output_dir, num_layers, hidden_dim, intermediate_dim,
-        max_length, intermediate=False
-    )
+    # Save any remaining data as final dataset
+    if texts_list:  # Only save if there's remaining data
+        logger.info("Saving final batch...")
+        save_dataset(
+            texts_list, input_ids_list, attention_mask_list,
+            hidden_states_dict, mlp_activations_dict,
+            output_dir, num_layers, hidden_dim, intermediate_dim,
+            max_length, intermediate=False
+        )
+    else:
+        logger.info("No remaining data to save.")
+    
+    # Clean up intermediate directory if it exists
+    intermediate_path = os.path.join(output_dir, "intermediate")
+    if os.path.exists(intermediate_path):
+        shutil.rmtree(intermediate_path)
+        logger.info("Cleaned up intermediate directory")
+    
+    # Get final dataset size for metadata
+    try:
+        if os.path.exists(output_dir) and os.path.isdir(output_dir):
+            final_dataset = load_from_disk(output_dir)
+            if isinstance(final_dataset, Dataset):
+                total_samples = len(final_dataset)
+            else:
+                total_samples = 0
+        else:
+            total_samples = 0
+    except:
+        total_samples = 0
     
     # Save metadata
     metadata = {
         "model_name": model_name,
         "dataset_name": dataset_name,
         "dataset_config": dataset_config,
-        "num_samples": len(texts_list),
+        "num_samples": total_samples,
         "max_length": max_length,
         "num_layers": num_layers,
         "hidden_dim": hidden_dim,
@@ -329,12 +348,13 @@ def generate_dataset(
     with open(os.path.join(output_dir, "metadata.json"), "w") as f:
         json.dump(metadata, f, indent=2)
     
-    logger.info(f"Dataset generation complete. Processed {len(texts_list)} samples.")
+    logger.info(f"Dataset generation complete. Total samples in dataset: {total_samples}")
 
 
 def save_dataset(
     texts_list: List[str],
     input_ids_list: List[np.ndarray],
+    attention_mask_list: List[np.ndarray],
     hidden_states_dict: Dict[int, List[np.ndarray]],
     mlp_activations_dict: Dict[int, List[np.ndarray]],
     output_dir: str,
@@ -344,15 +364,15 @@ def save_dataset(
     max_length: int,
     intermediate: bool = False
 ):
-    """Save dataset in HuggingFace format."""
+    """Save dataset in HuggingFace format, appending to existing dataset if it exists."""
     
     if not texts_list:
         logger.warning("No data to save")
         return
     
-    # Create dataset
-    dataset = create_layer_dataset(
-        texts_list, input_ids_list,
+    # Create new dataset from current batch
+    new_dataset = create_layer_dataset(
+        texts_list, input_ids_list, attention_mask_list,
         hidden_states_dict, mlp_activations_dict,
         num_layers, hidden_dim, intermediate_dim, max_length
     )
@@ -363,18 +383,43 @@ def save_dataset(
     else:
         save_path = output_dir
     
+    # Check if dataset already exists and append to it
+    if os.path.exists(save_path) and os.path.isdir(save_path):
+        try:
+            logger.info(f"Loading existing dataset from {save_path}")
+            loaded_dataset = load_from_disk(save_path)
+            
+            # Ensure we have a Dataset object (not DatasetDict)
+            from datasets import Dataset as HFDataset
+            if isinstance(loaded_dataset, HFDataset):
+                existing_dataset = loaded_dataset
+                
+                # Concatenate existing dataset with new data
+                logger.info(f"Concatenating {len(existing_dataset)} existing samples with {len(new_dataset)} new samples")
+                combined_dataset = concatenate_datasets([existing_dataset, new_dataset])
+                
+                logger.info(f"Combined dataset has {len(combined_dataset)} total samples")
+            else:
+                logger.warning(f"Loaded dataset is not a Dataset object, creating new dataset.")
+                combined_dataset = new_dataset
+        except Exception as e:
+            logger.warning(f"Failed to load existing dataset: {e}. Creating new dataset.")
+            combined_dataset = new_dataset
+    else:
+        combined_dataset = new_dataset
+    
     # Save dataset in Arrow format with optimal settings
-    dataset.save_to_disk(
+    # Calculate appropriate number of shards based on dataset size
+    num_samples = len(combined_dataset)
+    max_shards = max(1, min(8, num_samples // 100))  # At least 100 samples per shard, max 8 shards
+    
+    combined_dataset.save_to_disk(
         save_path,
-        num_shards=4,  # Split into multiple files for faster I/O
-        num_proc=4     # Use multiple processes for saving
+        num_shards=max_shards,
+        num_proc=min(4, max_shards)     # Use multiple processes for saving
     )
     
-    logger.info(f"Saved dataset: {len(dataset)} samples to {save_path}")
-    
-    # If this is the final save and intermediate exists, remove it
-    if not intermediate and os.path.exists(os.path.join(output_dir, "intermediate")):
-        shutil.rmtree(os.path.join(output_dir, "intermediate"))
+    logger.info(f"Saved dataset: {len(combined_dataset)} total samples to {save_path}")
 
 
 def main():

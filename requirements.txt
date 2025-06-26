@@ -10,4 +10,4 @@ accelerate
 datasets
 sentencepiece
 protobuf
-#wandb
+wandb
