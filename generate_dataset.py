@@ -4,10 +4,33 @@ Generate training dataset for sparsity predictors.
 
 This script runs a standard LLaMA model on text data and captures:
 - Input text
-- Hidden states for each token before each MLP layer
-- MLP activations for each token at each layer
+- Hidden states for the last token before each MLP layer
+- MLP activations for the last token at each layer
 
-The data is saved with sequence structure preserved for training predictors.
+The data is saved incrementally using:
+- .npz files for numpy arrays (compressed, one file per save batch)
+- Single CSV file for metadata (text, batch references)
+
+This approach avoids loading full datasets into memory and allows for:
+- Resumable processing
+- Memory-efficient storage with optimal compression
+- Lazy loading of arrays when needed
+
+Note: Only the last token's representations are saved to reduce storage requirements
+and focus on the final contextual representations for each sequence.
+
+Usage examples:
+  # Generate dataset
+  python generate_dataset.py --model_name meta-llama/Llama-2-7b-hf --output_dir data/c4
+  
+  # Show dataset statistics without loading arrays
+  python generate_dataset.py --show_stats --output_dir data/c4
+  
+  # Inspect a specific sample
+  python generate_dataset.py --inspect_sample 0 --output_dir data/c4
+  
+  # Create unified HuggingFace dataset from CSV file after processing (optional)
+  python generate_dataset.py --create_unified_dataset --output_dir data/c4
 """
 
 import argparse
@@ -16,55 +39,68 @@ import logging
 import os
 from typing import Dict, List, Optional, Tuple
 import numpy as np
-import shutil
-import random
-
+import time
 import torch
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
 )
 from transformers.trainer_utils import set_seed
-from datasets import load_dataset, Dataset, Features, Value, Array2D, Sequence, load_from_disk, concatenate_datasets
-from torch.utils.data import DataLoader
+from datasets import load_dataset
+from torch.utils.data import DataLoader as TorchDataLoader
 from tqdm import tqdm
 from src.activation_capture import ActivationCapture
-
+import csv
+import glob
+from src.predictor_trainer import get_sample_by_index
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def create_layer_dataset(
-    texts_list: List[str],
-    input_ids_list: List[np.ndarray],
-    attention_mask_list: List[np.ndarray],
-    hidden_states_dict: Dict[int, List[np.ndarray]], 
-    mlp_activations_dict: Dict[int, List[np.ndarray]],
-    num_layers: int,
-    hidden_dim: int,
-    intermediate_dim: int,
-    max_length: int
-) -> Dataset:
-    """Create a HuggingFace dataset from collected activations with sequence structure."""
-    
-    # Prepare data for dataset without fixed features
-    dataset_dict = {
-        "text": texts_list,
-        "input_ids": input_ids_list,
-        "attention_mask": attention_mask_list,
-    }
-    
-    # Add hidden states and activations for each layer
-    for layer_idx in range(num_layers):
-        if layer_idx in hidden_states_dict:
-            dataset_dict[f"hidden_states_layer_{layer_idx}"] = hidden_states_dict[layer_idx]
-            dataset_dict[f"mlp_activations_layer_{layer_idx}"] = mlp_activations_dict[layer_idx]
-    
-    # Create dataset without specifying fixed-length features
-    dataset = Dataset.from_dict(dataset_dict)
-    
-    return dataset
+def get_dataset_stats(output_dir: str) -> Optional[Dict]:
+    """Get dataset statistics without loading arrays into memory."""
+    try:
+        csv_file = os.path.join(output_dir, "dataset.csv")
+        if not os.path.exists(csv_file):
+            return None
+        
+        arrays_dir = os.path.join(output_dir, "arrays")
+        batch_files = glob.glob(os.path.join(arrays_dir, "batch_*.npz"))
+        
+        total_samples = 0
+        
+        # Count samples in the single CSV file
+        try:
+            with open(csv_file, 'r', newline='') as f:
+                reader = csv.reader(f)
+                next(reader)  # Skip header
+                total_samples = sum(1 for _ in reader)
+        except Exception as e:
+            logger.warning(f"Could not read {csv_file}: {e}")
+        
+        # Estimate storage sizes
+        metadata_size = os.path.getsize(csv_file) if os.path.exists(csv_file) else 0
+        arrays_size = sum(os.path.getsize(bf) for bf in batch_files if os.path.exists(bf))
+        
+        # Calculate average samples per batch
+        avg_samples_per_batch = 0
+        if batch_files and total_samples > 0:
+            avg_samples_per_batch = total_samples / len(batch_files)
+        
+        return {
+            "total_samples": total_samples,
+            "total_batches": len(batch_files),
+            "avg_samples_per_batch": int(avg_samples_per_batch),
+            "metadata_size_mb": metadata_size / (1024 * 1024),
+            "arrays_size_mb": arrays_size / (1024 * 1024),
+            "total_size_mb": (metadata_size + arrays_size) / (1024 * 1024),
+            "compression_ratio": f"{arrays_size / max(1, metadata_size):.1f}x"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting dataset stats: {e}")
+        return None
 
 
 def process_batch(
@@ -74,7 +110,7 @@ def process_batch(
     device: torch.device,
     num_layers: int
 ) -> Tuple[List[np.ndarray], List[np.ndarray], Dict[int, List[np.ndarray]], Dict[int, List[np.ndarray]]]:
-    """Process a batch of texts and return all activations."""
+    """Process a batch of texts and return last token activations for each sample."""
     
     # Move to device
     input_ids = tokenized_batch["input_ids"].to(device)
@@ -100,25 +136,22 @@ def process_batch(
     
     # Process each sample in the batch
     for batch_idx in range(batch_size):
-        # Get sequence length from attention mask
-        # seq_len = int(attention_mask_np[batch_idx].sum())
-        
         # Extract input_ids for this sample
         input_ids_sample = input_ids[batch_idx].cpu().numpy().astype(np.int32)
         input_ids_list.append(input_ids_sample)
         attention_mask_list.append(attention_mask_np[batch_idx])
         
-        # Collect activations for each layer
+        # Collect last token activations for each layer
         for layer_idx in range(num_layers):
             if layer_idx in capture.hidden_states:
-                # Move only the needed slice to CPU
-                hidden_state = capture.hidden_states[layer_idx][batch_idx].cpu().numpy().astype(np.float32)
+                # Extract only the last token's hidden state [-1, :]
+                hidden_state = capture.hidden_states[layer_idx][batch_idx,-1,:].cpu().numpy().astype(np.float32)
                 hidden_states_dict[layer_idx].append(hidden_state)
                 
-                # Get MLP activations
+                # Get last token's MLP activations
                 mlp_activation = capture.get_mlp_activations(layer_idx)
                 if mlp_activation is not None:
-                    mlp_act = mlp_activation[batch_idx].cpu().numpy().astype(np.float32)
+                    mlp_act = mlp_activation[batch_idx,-1,:].cpu().numpy().astype(np.float32)
                     mlp_activations_dict[layer_idx].append(mlp_act)
     
     # Clear GPU tensors from capture to free memory
@@ -140,7 +173,7 @@ def generate_dataset(
     save_interval: int = 1000,
     num_workers: int = 4,
     prefetch_batches: int = 2,
-    max_samples: int = 100000
+    max_samples: int = 100000,
 ):
     """Generate predictor training dataset with optimizations."""
     
@@ -248,7 +281,6 @@ def generate_dataset(
     dataset = dataset.with_format("torch")
     
     # Create DataLoader with num_workers=0 to avoid shared memory issues
-    from torch.utils.data import DataLoader as TorchDataLoader
     dataloader = TorchDataLoader(dataset, batch_size=batch_size, num_workers=0, pin_memory=False)  # type: ignore
     # Storage for collected data
     texts_list = []
@@ -284,8 +316,7 @@ def generate_dataset(
                 save_dataset(
                     texts_list, input_ids_list, attention_mask_list,
                     hidden_states_dict, mlp_activations_dict,
-                    output_dir, num_layers, hidden_dim, intermediate_dim,
-                    max_length, intermediate=False  # Save directly to main dataset
+                    output_dir, num_layers
                 )
                 
                 # Clear accumulated data after saving to avoid re-processing
@@ -307,29 +338,23 @@ def generate_dataset(
         save_dataset(
             texts_list, input_ids_list, attention_mask_list,
             hidden_states_dict, mlp_activations_dict,
-            output_dir, num_layers, hidden_dim, intermediate_dim,
-            max_length, intermediate=False
+            output_dir, num_layers
         )
     else:
         logger.info("No remaining data to save.")
     
-    # Clean up intermediate directory if it exists
-    intermediate_path = os.path.join(output_dir, "intermediate")
-    if os.path.exists(intermediate_path):
-        shutil.rmtree(intermediate_path)
-        logger.info("Cleaned up intermediate directory")
-    
-    # Get final dataset size for metadata
+    # Get final dataset size for metadata by counting the single CSV file
     try:
-        if os.path.exists(output_dir) and os.path.isdir(output_dir):
-            final_dataset = load_from_disk(output_dir)
-            if isinstance(final_dataset, Dataset):
-                total_samples = len(final_dataset)
-            else:
-                total_samples = 0
+        csv_file = os.path.join(output_dir, "dataset.csv")
+        if os.path.exists(csv_file):
+            with open(csv_file, 'r', newline='') as f:
+                reader = csv.reader(f)
+                next(reader)  # Skip header
+                total_samples = sum(1 for _ in reader)
         else:
             total_samples = 0
-    except:
+    except Exception as e:
+        logger.warning(f"Error counting samples for metadata: {e}")
         total_samples = 0
     
     # Save metadata
@@ -358,69 +383,80 @@ def save_dataset(
     hidden_states_dict: Dict[int, List[np.ndarray]],
     mlp_activations_dict: Dict[int, List[np.ndarray]],
     output_dir: str,
-    num_layers: int,
-    hidden_dim: int,
-    intermediate_dim: int,
-    max_length: int,
-    intermediate: bool = False
+    num_layers: int
 ):
-    """Save dataset in HuggingFace format, appending to existing dataset if it exists."""
+    """Save dataset using single .npz file for arrays and append to single CSV for metadata."""
     
     if not texts_list:
         logger.warning("No data to save")
         return
     
-    # Create new dataset from current batch
-    new_dataset = create_layer_dataset(
-        texts_list, input_ids_list, attention_mask_list,
-        hidden_states_dict, mlp_activations_dict,
-        num_layers, hidden_dim, intermediate_dim, max_length
-    )
+    # Create output directories
+    os.makedirs(output_dir, exist_ok=True)
+    arrays_dir = os.path.join(output_dir, "arrays")
+    os.makedirs(arrays_dir, exist_ok=True)
     
-    # Save path
-    if intermediate:
-        save_path = os.path.join(output_dir, "intermediate")
-    else:
-        save_path = output_dir
+    # Generate unique timestamp for this batch
+    timestamp = int(time.time() * 1000000)  # microsecond precision
     
-    # Check if dataset already exists and append to it
-    if os.path.exists(save_path) and os.path.isdir(save_path):
-        try:
-            logger.info(f"Loading existing dataset from {save_path}")
-            loaded_dataset = load_from_disk(save_path)
-            
-            # Ensure we have a Dataset object (not DatasetDict)
-            from datasets import Dataset as HFDataset
-            if isinstance(loaded_dataset, HFDataset):
-                existing_dataset = loaded_dataset
-                
-                # Concatenate existing dataset with new data
-                logger.info(f"Concatenating {len(existing_dataset)} existing samples with {len(new_dataset)} new samples")
-                combined_dataset = concatenate_datasets([existing_dataset, new_dataset])
-                
-                logger.info(f"Combined dataset has {len(combined_dataset)} total samples")
+    # Prepare single batch data
+    batch_data = {
+        'input_ids': np.stack(input_ids_list),
+        'attention_mask': np.stack(attention_mask_list),
+    }
+    logger.info(f"Input IDs shape: {batch_data['input_ids'].shape}")
+    # Add layer data to batch
+    for layer_idx in range(num_layers):
+        if layer_idx in hidden_states_dict:
+            batch_data[f'hidden_states_layer_{layer_idx}'] = np.stack(hidden_states_dict[layer_idx])
+            batch_data[f'mlp_activations_layer_{layer_idx}'] = np.stack(mlp_activations_dict[layer_idx])
+    
+    # Save single batch as .npz file
+    batch_filename = f"batch_{timestamp:016d}.npz"
+    batch_path = os.path.join(arrays_dir, batch_filename)
+    np.savez_compressed(batch_path, **batch_data)
+    logger.info(f"Saved batch with {len(texts_list)} samples to {batch_filename}")
+    # Create CSV rows for all samples in this batch
+    csv_rows = []
+    for sample_idx in range(len(texts_list)):
+        row = {
+            "text": texts_list[sample_idx],
+            "batch_file": batch_filename,
+            "batch_index": sample_idx,
+        }
+        
+        # Add layer columns
+        for layer_idx in range(num_layers):
+            if layer_idx in hidden_states_dict:
+                row[f"layer_{layer_idx}_available"] = True
             else:
-                logger.warning(f"Loaded dataset is not a Dataset object, creating new dataset.")
-                combined_dataset = new_dataset
-        except Exception as e:
-            logger.warning(f"Failed to load existing dataset: {e}. Creating new dataset.")
-            combined_dataset = new_dataset
+                row[f"layer_{layer_idx}_available"] = False
+        
+        csv_rows.append(row)
+    
+    # Append to single CSV file
+    csv_file = os.path.join(output_dir, "dataset.csv")
+    file_exists = os.path.exists(csv_file)
+    
+    # Determine fieldnames
+    if csv_rows:
+        fieldnames = list(csv_rows[0].keys())
     else:
-        combined_dataset = new_dataset
+        return
     
-    # Save dataset in Arrow format with optimal settings
-    # Calculate appropriate number of shards based on dataset size
-    num_samples = len(combined_dataset)
-    max_shards = max(1, min(8, num_samples // 100))  # At least 100 samples per shard, max 8 shards
+    # Append to CSV file
+    with open(csv_file, 'a', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        
+        # Write header only if file doesn't exist or is empty
+        if not file_exists or os.path.getsize(csv_file) == 0:
+            writer.writeheader()
+            logger.info(f"Created new CSV file: {csv_file}")
+        
+        # Write all rows
+        writer.writerows(csv_rows)
     
-    combined_dataset.save_to_disk(
-        save_path,
-        num_shards=max_shards,
-        num_proc=min(4, max_shards)     # Use multiple processes for saving
-    )
-    
-    logger.info(f"Saved dataset: {len(combined_dataset)} total samples to {save_path}")
-
+    logger.info(f"Appended {len(csv_rows)} samples to {csv_file}")
 
 def main():
     parser = argparse.ArgumentParser(description="Generate training dataset for sparsity predictors")
@@ -448,6 +484,10 @@ def main():
                        help="Random seed")
     parser.add_argument("--device", type=str, default="auto",
                        help="Device to use (auto, cpu, cuda)")
+    parser.add_argument("--inspect_sample", type=int, default=None,
+                       help="Inspect a specific sample by index (useful for debugging)")
+    parser.add_argument("--show_stats", action="store_true",
+                       help="Show dataset statistics without loading arrays")
     
     args = parser.parse_args()
     
@@ -466,6 +506,41 @@ def main():
     if device.type == "cpu":
         torch.set_num_threads(args.num_workers)
     
+    # Handle dataset statistics
+    if args.show_stats:
+        logger.info(f"Getting dataset statistics from {args.output_dir}")
+        stats = get_dataset_stats(args.output_dir)
+        if stats:
+            logger.info("Dataset Statistics:")
+            logger.info(f"  Total samples: {stats['total_samples']:,}")
+            logger.info(f"  Total batches: {stats['total_batches']:,}")
+            logger.info(f"  Avg samples per batch: {stats['avg_samples_per_batch']:,}")
+            logger.info(f"  Metadata size: {stats['metadata_size_mb']:.1f} MB")
+            logger.info(f"  Arrays size: {stats['arrays_size_mb']:.1f} MB")
+            logger.info(f"  Total size: {stats['total_size_mb']:.1f} MB")
+            logger.info(f"  Arrays/Metadata ratio: {stats['compression_ratio']}")
+        else:
+            logger.error("Could not get dataset statistics")
+        return
+    
+    # Handle sample inspection
+    if args.inspect_sample is not None:
+        logger.info(f"Inspecting sample {args.inspect_sample} from {args.output_dir}")
+        sample = get_sample_by_index(args.output_dir, args.inspect_sample)
+        if sample:
+            logger.info(f"Sample {args.inspect_sample}:")
+            logger.info(f"  Text: {sample['text'][:100]}...")
+            logger.info(f"  Input IDs shape: {sample['input_ids'].shape}")
+            logger.info(f"  Attention mask shape: {sample['attention_mask'].shape}")
+            for key in sample.keys():
+                if 'hidden_states' in key:
+                    logger.info(f"  {key} shape (last token): {sample[key].shape}")
+                elif 'mlp_activations' in key:
+                    logger.info(f"  {key} shape (last token): {sample[key].shape}")
+        else:
+            logger.error(f"Could not load sample {args.inspect_sample}")
+        return
+    
     # Generate dataset
     generate_dataset(
         model_name=args.model_name,
@@ -478,7 +553,7 @@ def main():
         save_interval=args.save_interval,
         num_workers=args.num_workers,
         prefetch_batches=args.prefetch_batches,
-        max_samples=args.max_samples
+        max_samples=args.max_samples,
     )
 
 

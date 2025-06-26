@@ -1,6 +1,9 @@
 import logging
 import os
-from typing import Dict,Optional
+import csv
+import numpy as np
+from typing import Dict, Optional, List, Any
+
 
 import torch
 import torch.nn as nn
@@ -8,106 +11,244 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset as TorchDataset
 from transformers.optimization import get_linear_schedule_with_warmup
 
-from datasets import load_from_disk
+
 import wandb
 from tqdm import tqdm
 
 from src.modeling_skip import FastLoRAProjection
-from src.configuration_skip import SkipConnectionConfig
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-class PredictorDataset(TorchDataset):
-    """Dataset for training predictors from pre-generated data."""
+class ChunkCache:
+    """Simple LRU cache for .npz chunk files."""
     
-    def __init__(self, dataset_dir: str, layer_idx: int, split: str = "train", 
-                 max_samples: Optional[int] = None):
+    def __init__(self, max_size: int = 50):
+        self.max_size = max_size
+        self.cache = {}
+        self.access_order = []
+    
+    def get(self, file_path: str) -> Optional[Dict[str, np.ndarray]]:
+        """Get cached chunk data."""
+        if file_path in self.cache:
+            # Move to end (most recently used)
+            self.access_order.remove(file_path)
+            self.access_order.append(file_path)
+            return self.cache[file_path]
+        return None
+    
+    def put(self, file_path: str, data: Dict[str, np.ndarray]):
+        """Cache chunk data with LRU eviction."""
+        if file_path in self.cache:
+            # Update existing entry
+            self.cache[file_path] = data
+            self.access_order.remove(file_path)
+            self.access_order.append(file_path)
+        else:
+            # Add new entry
+            if len(self.cache) >= self.max_size:
+                # Evict least recently used
+                lru_key = self.access_order.pop(0)
+                del self.cache[lru_key]
+            
+            self.cache[file_path] = data
+            self.access_order.append(file_path)
+    
+    def clear(self):
+        """Clear the cache."""
+        self.cache.clear()
+        self.access_order.clear()
+    
+    def size(self) -> int:
+        """Get current cache size."""
+        return len(self.cache)
+
+
+# Global chunk cache instance
+_chunk_cache = ChunkCache(max_size=50)
+
+
+def load_array_from_chunk(arrays_dir: str, batch_filename: str, batch_index: int, array_name: str) -> np.ndarray:
+    """Load a specific array from a batch .npz file with caching."""
+    file_path = os.path.join(arrays_dir, batch_filename)
+    
+    # Check cache first
+    cached_data = _chunk_cache.get(file_path)
+    if cached_data is not None:
+        return cached_data[array_name][batch_index]
+    
+    # Load from disk and cache
+    with np.load(file_path, allow_pickle=False) as data:
+        # Convert to dict for caching (since npz files can't be cached directly)
+        cached_data = {key: data[key] for key in data.files}
+        _chunk_cache.put(file_path, cached_data)
+        return cached_data[array_name][batch_index]
+
+
+def get_sample_by_index(output_dir: str, index: int) -> Optional[Dict]:
+    """Load a specific sample by index without loading the full dataset."""
+    try:
+        csv_file = os.path.join(output_dir, "dataset.csv")
+        if not os.path.exists(csv_file):
+            return None
+        
+        arrays_dir = os.path.join(output_dir, "arrays")
+        
+        # Find the row at the specified index
+        with open(csv_file, 'r', newline='') as f:
+            reader = csv.DictReader(f)
+            for current_idx, row in enumerate(reader):
+                if current_idx == index:
+                    batch_filename = row['batch_file']
+                    batch_index = int(row['batch_index'])
+                    
+                    # Load the arrays for this sample
+                    sample = {
+                        'text': row['text'],
+                        'input_ids': load_array_from_chunk(arrays_dir, batch_filename, batch_index, 'input_ids'),
+                        'attention_mask': load_array_from_chunk(arrays_dir, batch_filename, batch_index, 'attention_mask'),
+                    }
+                    
+                    # Load layer arrays
+                    for col in row.keys():
+                        if col.startswith('layer_') and col.endswith('_available') and row[col].lower() == 'true':
+                            layer_idx = int(col.split('_')[1])
+                            sample[f'hidden_states_layer_{layer_idx}'] = load_array_from_chunk(
+                                arrays_dir, batch_filename, batch_index, f'hidden_states_layer_{layer_idx}'
+                            )
+                            sample[f'mlp_activations_layer_{layer_idx}'] = load_array_from_chunk(
+                                arrays_dir, batch_filename, batch_index, f'mlp_activations_layer_{layer_idx}'
+                            )
+                    
+                    return sample
+        
+        return None  # Index out of range
+        
+    except Exception as e:
+        logger.error(f"Error loading sample {index}: {e}")
+        return None
+
+
+class StreamingSparsityDataset(TorchDataset):
+    """Streaming dataset that loads data on-demand from CSV and .npz files with caching."""
+    
+    def __init__(self, output_dir: str, layer_idx: int, cache_size: int = 50):
         """
         Args:
-            dataset_dir: Directory containing layer datasets
-            layer_idx: Which layer's predictor to train
-            split: 'train' or 'val'
-            max_samples: Maximum number of samples to use
+            output_dir: Directory containing dataset.csv and arrays/ folder
+            layer_idx: Which layer to load data for
+            cache_size: Maximum number of .npz files to cache in memory
         """
+        self.output_dir = output_dir
         self.layer_idx = layer_idx
-        self.layer_dir = os.path.join(dataset_dir, f"layer_{layer_idx}")
+        self.csv_file = os.path.join(output_dir, "dataset.csv")
+        self.arrays_dir = os.path.join(output_dir, "arrays")
         
-        # Load the HuggingFace dataset
-        if not os.path.exists(self.layer_dir):
-            raise ValueError(f"Layer dataset not found at {self.layer_dir}")
-            
-        self.dataset = load_from_disk(self.layer_dir)
+        if not os.path.exists(self.csv_file):
+            raise FileNotFoundError(f"CSV file not found: {self.csv_file}")
         
-        # Split into train/val if needed
-        if "train" not in self.dataset:
-            # Create train/val split (90/10)
-            split_dataset = self.dataset.train_test_split(test_size=0.1, seed=42)
-            self.dataset = split_dataset["train"] if split == "train" else split_dataset["test"]
-        else:
-            self.dataset = self.dataset[split]
+        if not os.path.exists(self.arrays_dir):
+            raise FileNotFoundError(f"Arrays directory not found: {self.arrays_dir}")
         
-        # Limit samples if requested
-        if max_samples and max_samples < len(self.dataset):
-            self.dataset = self.dataset.select(range(max_samples))
+        # Configure cache size
+        global _chunk_cache
+        _chunk_cache = ChunkCache(max_size=cache_size)
         
-        logger.info(f"Loaded {len(self.dataset)} samples for layer {layer_idx} ({split})")
+        # Read CSV metadata once and store sample info
+        self.samples = []
+        with open(self.csv_file, 'r', newline='') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                # Only include samples that have data for our layer
+                layer_key = f"layer_{layer_idx}_available"
+                if layer_key in row and row[layer_key].lower() == 'true':
+                    self.samples.append({
+                        'text': row['text'],
+                        'batch_file': row['batch_file'],
+                        'batch_index': int(row['batch_index'])
+                    })
+        
+        logger.info(f"Streaming dataset loaded with {len(self.samples)} samples for layer {layer_idx}")
+        logger.info(f"Chunk cache configured with max size: {cache_size}")
     
     def __len__(self):
-        return len(self.dataset)
+        return len(self.samples)
     
-    def __getitem__(self, idx):
-        item = self.dataset[idx]
+    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
+        """Load a single sample on-demand."""
+        if idx >= len(self.samples):
+            raise IndexError(f"Index {idx} out of range for dataset of size {len(self.samples)}")
+        
+        sample_info = self.samples[idx]
+        batch_filename = sample_info['batch_file']
+        batch_index = sample_info['batch_index']
+        
+        # Load arrays on-demand (with caching)
+        hidden_states = load_array_from_chunk(
+            self.arrays_dir, batch_filename, batch_index, f'hidden_states_layer_{self.layer_idx}'
+        )
+        mlp_activations = load_array_from_chunk(
+            self.arrays_dir, batch_filename, batch_index, f'mlp_activations_layer_{self.layer_idx}'
+        )
+        
         return {
-            "hidden_states": torch.tensor(item["hidden_states"], dtype=torch.float32),
-            "mlp_activations": torch.tensor(item["mlp_activations"], dtype=torch.float32)
+            'text': sample_info['text'],
+            'hidden_states': torch.from_numpy(hidden_states).float(),
+            'mlp_activations': torch.from_numpy(mlp_activations).float()
+        }
+    
+    def clear_cache(self):
+        """Clear the chunk cache."""
+        global _chunk_cache
+        _chunk_cache.clear()
+        logger.info("Cleared chunk cache")
+    
+    def get_cache_stats(self) -> Dict[str, int]:
+        """Get cache statistics."""
+        global _chunk_cache
+        return {
+            "cache_size": _chunk_cache.size(),
+            "max_cache_size": _chunk_cache.max_size
         }
 
 
 class LayerwisePredictorTrainer:
     """Trainer for layer-wise predictors."""
     
-    def __init__(self, config: SkipConnectionConfig, device: torch.device):
-        self.config = config
+    def __init__(self, layer_idx: int, hidden_size: int, intermediate_size: int, lora_size: int, device: torch.device):
         self.device = device
-        self.hidden_size = config.hidden_size
-        self.intermediate_size = config.intermediate_size
+        self.layer_idx = layer_idx
+        self.hidden_size = hidden_size
+        self.intermediate_size = intermediate_size
         
         # Initialize predictors for each layer
-        self.predictors = nn.ModuleList([
-            FastLoRAProjection(
+        self.predictor = FastLoRAProjection(
                 hidden_size=self.hidden_size,
                 intermediate_size=self.intermediate_size,
-                lora_size=config.lora_size
+                lora_size=lora_size
             ).to(device)
-            for _ in range(config.num_hidden_layers)
-        ])
     
     def compute_loss(self, 
-                    layer_idx: int,
                     hidden_states: torch.Tensor,
-                    mlp_activations: torch.Tensor,
-                    k: int) -> torch.Tensor:
+                    mlp_activations: torch.Tensor) -> torch.Tensor:
         """Compute predictor loss."""
         # Get predictor scores
-        pred_scores = self.predictors[layer_idx](hidden_states)  # [batch_size, intermediate_size]
+        pred_scores = self.predictor(hidden_states)  # [batch_size, intermediate_size]
         
         # Get top-k indices from ground truth
-        gt_mask = (mlp_activations > 0).long()
-        
+        gt_mask = (mlp_activations > 0).float()
         # Compute binary cross-entropy loss
         loss = F.binary_cross_entropy_with_logits(pred_scores, gt_mask)
         
         return loss
     
     def evaluate_predictor(self, 
-                          layer_idx: int,
                           dataloader: DataLoader,
                           max_batches: int = 50) -> Dict[str, float]:
         """Evaluate predictor performance."""
-        self.predictors[layer_idx].eval()
+        self.predictor.eval()
         
         total_precision = 0.0
         total_recall = 0.0
@@ -123,14 +264,14 @@ class LayerwisePredictorTrainer:
                 mlp_activations = batch["mlp_activations"].to(self.device)
                 
                 # Get predictions
-                pred_scores = self.predictors[layer_idx](hidden_states)
+                pred_scores = self.predictor(hidden_states)
                 pred_mask = (F.sigmoid(pred_scores) > 0.5)
                 
                 # Get ground truth
                 gt_mask = (mlp_activations > 0)
                 tp = (pred_mask * gt_mask).sum().item()
-                fp = (pred_mask * (1 - gt_mask)).sum().item()
-                fn = ((1 - pred_mask) * gt_mask).sum().item()
+                fp = (pred_mask * (~gt_mask)).sum().item()
+                fn = ((~pred_mask) * gt_mask).sum().item()
                 
                 precision = tp / (tp + fp + 1e-8)
                 recall = tp / (tp + fn + 1e-8)
@@ -142,7 +283,7 @@ class LayerwisePredictorTrainer:
                 
                 num_batches += hidden_states.shape[0]
         
-        self.predictors[layer_idx].train()
+        self.predictor.train()
         
         if num_batches == 0:
             return {"precision": 0.0, "recall": 0.0, "f1": 0.0}
@@ -153,22 +294,22 @@ class LayerwisePredictorTrainer:
             "f1": total_f1 / num_batches
         }
     
-    def train_layer(self, layer_idx: int, train_dataset: PredictorDataset,
-                   val_dataset: PredictorDataset, num_epochs: int,
+    def train_layer(self, train_dataset: TorchDataset,
+                   val_dataset: TorchDataset, num_epochs: int,
                    batch_size: int, learning_rate: float,
-                   k: int, use_wandb: bool = False) -> FastLoRAProjection:
+                   use_wandb: bool = False) -> FastLoRAProjection:
         """Train a single layer's predictor."""
         
-        logger.info(f"Training predictor for layer {layer_idx}")
+        logger.info(f"Training predictor for layer {self.layer_idx}")
         
-        predictor = self.predictors[layer_idx]
+        predictor = self.predictor
         predictor.train()
         
         # Create data loaders
         train_loader = DataLoader(train_dataset, batch_size=batch_size, 
-                                shuffle=True, num_workers=4, pin_memory=True)
+                                shuffle=True, num_workers=0, pin_memory=True)
         val_loader = DataLoader(val_dataset, batch_size=batch_size,
-                              shuffle=False, num_workers=2, pin_memory=True)
+                              shuffle=False, num_workers=0, pin_memory=True)
         
         # Setup optimizer
         optimizer = torch.optim.AdamW(predictor.parameters(), lr=learning_rate, weight_decay=0.01)
@@ -184,16 +325,21 @@ class LayerwisePredictorTrainer:
         best_f1 = 0.0
         global_step = 0
         
+        # Log cache stats at start of training
+        if isinstance(train_dataset, StreamingSparsityDataset):
+            cache_stats = train_dataset.get_cache_stats()
+            logger.info(f"Training started with cache stats: {cache_stats}")
+        
         for epoch in range(num_epochs):
             epoch_loss = 0.0
-            progress_bar = tqdm(train_loader, desc=f"Layer {layer_idx} - Epoch {epoch+1}/{num_epochs}")
+            progress_bar = tqdm(train_loader, desc=f"Layer {self.layer_idx} - Epoch {epoch+1}/{num_epochs}")
             
             for batch in progress_bar:
                 hidden_states = batch["hidden_states"].to(self.device)
                 mlp_activations = batch["mlp_activations"].to(self.device)
                 
                 # Compute loss
-                loss = self.compute_loss(layer_idx, hidden_states, mlp_activations, k)
+                loss = self.compute_loss(hidden_states, mlp_activations)
                 
                 # Backward pass
                 optimizer.zero_grad()
@@ -215,40 +361,42 @@ class LayerwisePredictorTrainer:
                 # Log to wandb
                 if use_wandb and global_step % 50 == 0:
                     wandb.log({
-                        f"layer_{layer_idx}/train_loss": loss.item(),
-                        f"layer_{layer_idx}/learning_rate": scheduler.get_last_lr()[0],
+                        f"layer_{self.layer_idx}/train_loss": loss.item(),
+                        f"layer_{self.layer_idx}/learning_rate": scheduler.get_last_lr()[0],
                         "step": global_step
                     })
             
             # Evaluation
-            eval_metrics = self.evaluate_predictor(layer_idx, val_loader, k)
-            logger.info(f"Layer {layer_idx} - Epoch {epoch+1} - Eval metrics: {eval_metrics}")
+            eval_metrics = self.evaluate_predictor(val_loader)
+            logger.info(f"Layer {self.layer_idx} - Epoch {epoch+1} - Eval metrics: {eval_metrics}")
+            
+            # Log cache stats during training
+            if isinstance(train_dataset, StreamingSparsityDataset):
+                cache_stats = train_dataset.get_cache_stats()
+                logger.info(f"Cache stats after epoch {epoch+1}: {cache_stats}")
             
             if use_wandb:
                 wandb.log({
-                    f"layer_{layer_idx}/eval_precision": eval_metrics["precision"],
-                    f"layer_{layer_idx}/eval_recall": eval_metrics["recall"],
-                    f"layer_{layer_idx}/eval_f1": eval_metrics["f1"],
+                    f"layer_{self.layer_idx}/eval_precision": eval_metrics["precision"],
+                    f"layer_{self.layer_idx}/eval_recall": eval_metrics["recall"],
+                    f"layer_{self.layer_idx}/eval_f1": eval_metrics["f1"],
                     "epoch": epoch + 1
                 })
             
             # Save best model
             if eval_metrics["f1"] > best_f1:
                 best_f1 = eval_metrics["f1"]
-                logger.info(f"Layer {layer_idx} - New best F1: {best_f1:.4f}")
+                logger.info(f"Layer {self.layer_idx} - New best F1: {best_f1:.4f}")
         
-        return self.predictors[layer_idx]  # type: ignore
+        return self.predictor  # type: ignore
     
-    def save_predictors(self, save_dir: str):
+    def save_predictor(self, save_dir: str, name: str = "predictor"):
         """Save all trained predictors."""
         os.makedirs(save_dir, exist_ok=True)
         
-        # Save each predictor
-        for i, predictor in enumerate(self.predictors):
-            torch.save(predictor.state_dict(), 
-                      os.path.join(save_dir, f"predictor_layer_{i}.pt"))
-        
-        # Save config
-        self.config.save_pretrained(save_dir)
+        # Save predictor
+        torch.save(self.predictor.state_dict(), 
+                      os.path.join(save_dir, f"{name}.pt"))
         
         logger.info(f"Saved predictors to {save_dir}")
+
