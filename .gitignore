@@ -21,6 +21,7 @@ wheels/
 .installed.cfg
 *.egg
 .cursorrules
+trained_predictors/
 wandb/
 # CUDA
 *.i
