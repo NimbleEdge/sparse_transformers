@@ -7,7 +7,7 @@ based on the hidden states before each MLP layer. Uses the last token representa
 from the generated datasets.
 
 Usage:
-    python train_predictors.py \
+    python train.py \
         --config meta-llama/Llama-2-7b-hf \
         --dataset_dir ./data/c4 \
         --output_dir ./trained_predictors \
@@ -28,7 +28,7 @@ import wandb
 
 from transformers.trainer_utils import set_seed
 
-from src.predictor_trainer import LayerwisePredictorTrainer, StreamingSparsityDataset
+from src.trainer import LayerwisePredictorTrainer, StreamingSparsityDataset
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -44,10 +44,12 @@ def main():
     parser.add_argument("--layer_idx", type=int, required=True, help="Which layer to train predictor for")
     parser.add_argument("--batch_size", type=int, default=64, help="Training batch size")
     parser.add_argument("--num_epochs", type=int, default=10, help="Number of training epochs")
-    parser.add_argument("--learning_rate", type=float, default=1e-3, help="Learning rate")
+    parser.add_argument("--learning_rate", type=float, default=1e-5, help="Learning rate")
     parser.add_argument("--lora_size", type=int, default=None, help="LoRA bottleneck size (default: 4% of intermediate_size)")
     parser.add_argument("--val_split", type=float, default=0.2, help="Validation split fraction")
     parser.add_argument("--cache_size", type=int, default=50, help="Number of .npz chunk files to cache in memory")
+    parser.add_argument("--load_full_dataset", action="store_true", help="Load full dataset into memory at initialization (faster but uses more memory)")
+    parser.add_argument("--checkpoint_save_interval", type=int, default=1000, help="Save checkpoint every N steps")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--use_wandb", action="store_true", help="Use Weights & Biases logging")
     parser.add_argument("--wandb_project", type=str, default="llama-skip-predictors", help="W&B project name")
@@ -99,8 +101,9 @@ def main():
     )
     
     # Load streaming datasets
-    logger.info(f"Loading streaming dataset for layer {args.layer_idx}")
-    full_dataset = StreamingSparsityDataset(args.dataset_dir, args.layer_idx, cache_size=args.cache_size)
+    dataset_mode = "full dataset in memory" if args.load_full_dataset else "streaming with chunk cache"
+    logger.info(f"Loading dataset for layer {args.layer_idx} using {dataset_mode}")
+    full_dataset = StreamingSparsityDataset(args.dataset_dir, args.layer_idx, cache_size=args.cache_size, load_full_dataset=args.load_full_dataset)
     
     # Create train/validation split
     total_samples = len(full_dataset)
@@ -114,6 +117,7 @@ def main():
     )
     
     logger.info(f"Using {len(train_dataset)} training samples, {len(val_dataset)} validation samples")
+    logger.info(f"Checkpoints will be saved every {args.checkpoint_save_interval} steps to {args.output_dir}")
     
     # Train predictor
     trainer.train_layer(
@@ -122,11 +126,14 @@ def main():
         num_epochs=args.num_epochs,
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,
-        use_wandb=args.use_wandb
+        use_wandb=args.use_wandb,
+        save_dir=args.output_dir,
+        save_interval=args.checkpoint_save_interval
     )
             
-    # Save predictor
-    trainer.save_predictor(args.output_dir, name=f"predictor_layer_{args.layer_idx}")
+    # Save final predictor
+    trainer.save_predictor(args.output_dir, name=f"final_predictor_layer_{args.layer_idx}")
+    logger.info(f"Saved final predictor for layer {args.layer_idx}")
     
     if args.use_wandb:
         wandb.finish()

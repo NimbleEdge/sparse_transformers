@@ -21,7 +21,7 @@ and focus on the final contextual representations for each sequence.
 
 Usage examples:
   # Generate dataset
-  python generate_dataset.py --model_name meta-llama/Llama-2-7b-hf --output_dir data/c4
+  python generate_dataset.py --model_name meta-llama/Llama-3.2-3B-Instruct --output_dir ./data/c4 --max_samples 100000 --device cuda --save_interval 500
   
   # Show dataset statistics without loading arrays
   python generate_dataset.py --show_stats --output_dir data/c4

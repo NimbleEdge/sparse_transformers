@@ -134,17 +134,20 @@ def get_sample_by_index(output_dir: str, index: int) -> Optional[Dict]:
 class StreamingSparsityDataset(TorchDataset):
     """Streaming dataset that loads data on-demand from CSV and .npz files with caching."""
     
-    def __init__(self, output_dir: str, layer_idx: int, cache_size: int = 50):
+    def __init__(self, output_dir: str, layer_idx: int, cache_size: int = 50, load_full_dataset: bool = False):
         """
         Args:
             output_dir: Directory containing dataset.csv and arrays/ folder
             layer_idx: Which layer to load data for
             cache_size: Maximum number of .npz files to cache in memory
+            load_full_dataset: If True, load all data into memory at initialization
         """
         self.output_dir = output_dir
         self.layer_idx = layer_idx
         self.csv_file = os.path.join(output_dir, "dataset.csv")
         self.arrays_dir = os.path.join(output_dir, "arrays")
+        self.load_full_dataset = load_full_dataset
+        self.full_data = None  # Will store all data if load_full_dataset is True
         
         if not os.path.exists(self.csv_file):
             raise FileNotFoundError(f"CSV file not found: {self.csv_file}")
@@ -171,16 +174,51 @@ class StreamingSparsityDataset(TorchDataset):
                     })
         
         logger.info(f"Streaming dataset loaded with {len(self.samples)} samples for layer {layer_idx}")
-        logger.info(f"Chunk cache configured with max size: {cache_size}")
+        
+        if self.load_full_dataset:
+            logger.info("Loading full dataset into memory...")
+            self._load_full_data()
+            logger.info("Full dataset loaded into memory")
+        else:
+            logger.info(f"Chunk cache configured with max size: {cache_size}")
+    
+    def _load_full_data(self):
+        """Load all data into memory."""
+        self.full_data = []
+        
+        logger.info(f"Loading {len(self.samples)} samples into memory...")
+        for i, sample_info in enumerate(tqdm(self.samples, desc="Loading samples")):
+            batch_filename = sample_info['batch_file']
+            batch_index = sample_info['batch_index']
+            
+            # Load arrays
+            hidden_states = load_array_from_chunk(
+                self.arrays_dir, batch_filename, batch_index, f'hidden_states_layer_{self.layer_idx}'
+            )
+            mlp_activations = load_array_from_chunk(
+                self.arrays_dir, batch_filename, batch_index, f'mlp_activations_layer_{self.layer_idx}'
+            )
+            
+            # Store as tensors for faster access
+            self.full_data.append({
+                'text': sample_info['text'],
+                'hidden_states': torch.from_numpy(hidden_states).float(),
+                'mlp_activations': torch.from_numpy(mlp_activations).float()
+            })
     
     def __len__(self):
         return len(self.samples)
     
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
-        """Load a single sample on-demand."""
+        """Load a single sample, either from memory or on-demand."""
         if idx >= len(self.samples):
             raise IndexError(f"Index {idx} out of range for dataset of size {len(self.samples)}")
         
+        # Return from memory if full dataset is loaded
+        if self.load_full_dataset and self.full_data is not None:
+            return self.full_data[idx]
+        
+        # Otherwise, load on-demand (with caching)
         sample_info = self.samples[idx]
         batch_filename = sample_info['batch_file']
         batch_index = sample_info['batch_index']
@@ -200,18 +238,30 @@ class StreamingSparsityDataset(TorchDataset):
         }
     
     def clear_cache(self):
-        """Clear the chunk cache."""
-        global _chunk_cache
-        _chunk_cache.clear()
-        logger.info("Cleared chunk cache")
+        """Clear the chunk cache or full dataset from memory."""
+        if self.load_full_dataset and self.full_data is not None:
+            self.full_data = None
+            logger.info("Cleared full dataset from memory")
+        else:
+            global _chunk_cache
+            _chunk_cache.clear()
+            logger.info("Cleared chunk cache")
     
-    def get_cache_stats(self) -> Dict[str, int]:
+    def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache statistics."""
-        global _chunk_cache
-        return {
-            "cache_size": _chunk_cache.size(),
-            "max_cache_size": _chunk_cache.max_size
-        }
+        if self.load_full_dataset:
+            return {
+                "full_dataset_loaded": self.full_data is not None,
+                "total_samples_in_memory": len(self.full_data) if self.full_data else 0,
+                "cache_type": "full_dataset"
+            }
+        else:
+            global _chunk_cache
+            return {
+                "cache_size": _chunk_cache.size(),
+                "max_cache_size": _chunk_cache.max_size,
+                "cache_type": "chunk_cache"
+            }
 
 
 class LayerwisePredictorTrainer:
@@ -254,7 +304,7 @@ class LayerwisePredictorTrainer:
         total_recall = 0.0
         total_f1 = 0.0
         num_batches = 0
-        
+        total_accuracy = 0.0
         with torch.no_grad():
             for batch_idx, batch in enumerate(dataloader):
                 if batch_idx >= max_batches:
@@ -280,7 +330,7 @@ class LayerwisePredictorTrainer:
                 total_precision += precision
                 total_recall += recall
                 total_f1 += f1
-                
+                total_accuracy += (pred_mask == gt_mask).sum().item()/ pred_mask.numel()
                 num_batches += hidden_states.shape[0]
         
         self.predictor.train()
@@ -289,6 +339,7 @@ class LayerwisePredictorTrainer:
             return {"precision": 0.0, "recall": 0.0, "f1": 0.0}
         
         return {
+            "accuracy": total_accuracy / num_batches,
             "precision": total_precision / num_batches,
             "recall": total_recall / num_batches,
             "f1": total_f1 / num_batches
@@ -297,8 +348,20 @@ class LayerwisePredictorTrainer:
     def train_layer(self, train_dataset: TorchDataset,
                    val_dataset: TorchDataset, num_epochs: int,
                    batch_size: int, learning_rate: float,
-                   use_wandb: bool = False) -> FastLoRAProjection:
-        """Train a single layer's predictor."""
+                   use_wandb: bool = False, save_dir: Optional[str] = None,
+                   save_interval: int = 1000) -> FastLoRAProjection:
+        """Train a single layer's predictor.
+        
+        Args:
+            train_dataset: Training dataset
+            val_dataset: Validation dataset  
+            num_epochs: Number of training epochs
+            batch_size: Batch size for training
+            learning_rate: Learning rate
+            use_wandb: Whether to log to Weights & Biases
+            save_dir: Directory to save checkpoints and best model (optional)
+            save_interval: Save checkpoint every N steps
+        """
         
         logger.info(f"Training predictor for layer {self.layer_idx}")
         
@@ -307,9 +370,9 @@ class LayerwisePredictorTrainer:
         
         # Create data loaders
         train_loader = DataLoader(train_dataset, batch_size=batch_size, 
-                                shuffle=True, num_workers=0, pin_memory=True)
+                                shuffle=True, num_workers=8, pin_memory=True, prefetch_factor=4)
         val_loader = DataLoader(val_dataset, batch_size=batch_size,
-                              shuffle=False, num_workers=0, pin_memory=True)
+                              shuffle=False, num_workers=4, pin_memory=True, prefetch_factor=2)
         
         # Setup optimizer
         optimizer = torch.optim.AdamW(predictor.parameters(), lr=learning_rate, weight_decay=0.01)
@@ -325,16 +388,14 @@ class LayerwisePredictorTrainer:
         best_f1 = 0.0
         global_step = 0
         
-        # Log cache stats at start of training
-        if isinstance(train_dataset, StreamingSparsityDataset):
-            cache_stats = train_dataset.get_cache_stats()
-            logger.info(f"Training started with cache stats: {cache_stats}")
+        # Calculate total steps for progress bar
+        total_steps = len(train_loader) * num_epochs
+        progress_bar = tqdm(total=total_steps, desc=f"Training Layer {self.layer_idx}")
         
         for epoch in range(num_epochs):
             epoch_loss = 0.0
-            progress_bar = tqdm(train_loader, desc=f"Layer {self.layer_idx} - Epoch {epoch+1}/{num_epochs}")
             
-            for batch in progress_bar:
+            for batch in train_loader:
                 hidden_states = batch["hidden_states"].to(self.device)
                 mlp_activations = batch["mlp_activations"].to(self.device)
                 
@@ -353,9 +414,12 @@ class LayerwisePredictorTrainer:
                 global_step += 1
                 
                 # Update progress bar
+                progress_bar.update(1)
                 progress_bar.set_postfix({
+                    'epoch': f"{epoch+1}/{num_epochs}",
                     'loss': f"{loss.item():.4f}",
-                    'lr': f"{scheduler.get_last_lr()[0]:.2e}"
+                    'lr': f"{scheduler.get_last_lr()[0]:.2e}",
+                    'step': f"{global_step}/{total_steps}"
                 })
                 
                 # Log to wandb
@@ -363,20 +427,22 @@ class LayerwisePredictorTrainer:
                     wandb.log({
                         f"layer_{self.layer_idx}/train_loss": loss.item(),
                         f"layer_{self.layer_idx}/learning_rate": scheduler.get_last_lr()[0],
+                        f"layer_{self.layer_idx}/gradient_norm": torch.norm(torch.stack([p.grad.norm() for p in predictor.parameters()])),
                         "step": global_step
                     })
+                
+                # Save checkpoint at regular intervals
+                if save_dir and global_step % save_interval == 0:
+                    checkpoint_name = f"checkpoint_layer_{self.layer_idx}_step_{global_step}"
+                    self.save_predictor(save_dir, name=checkpoint_name)
+                    logger.info(f"Saved checkpoint at step {global_step}: {checkpoint_name}")
             
             # Evaluation
             eval_metrics = self.evaluate_predictor(val_loader)
-            logger.info(f"Layer {self.layer_idx} - Epoch {epoch+1} - Eval metrics: {eval_metrics}")
-            
-            # Log cache stats during training
-            if isinstance(train_dataset, StreamingSparsityDataset):
-                cache_stats = train_dataset.get_cache_stats()
-                logger.info(f"Cache stats after epoch {epoch+1}: {cache_stats}")
             
             if use_wandb:
                 wandb.log({
+                    f"layer_{self.layer_idx}/eval_accuracy": eval_metrics["accuracy"],
                     f"layer_{self.layer_idx}/eval_precision": eval_metrics["precision"],
                     f"layer_{self.layer_idx}/eval_recall": eval_metrics["recall"],
                     f"layer_{self.layer_idx}/eval_f1": eval_metrics["f1"],
@@ -385,8 +451,22 @@ class LayerwisePredictorTrainer:
             
             # Save best model
             if eval_metrics["f1"] > best_f1:
-                best_f1 = eval_metrics["f1"]
-                logger.info(f"Layer {self.layer_idx} - New best F1: {best_f1:.4f}")
+                best_f1 = eval_metrics["f1"]                
+                # Save the best model immediately
+                if save_dir:
+                    best_model_name = f"best_predictor_layer_{self.layer_idx}"
+                    self.save_predictor(save_dir, name=best_model_name)
+                    logger.info(f"Saved new best model: {best_model_name}")
+                    
+                    # Also log to wandb if enabled
+                    if use_wandb:
+                        wandb.log({
+                            f"layer_{self.layer_idx}/best_f1": best_f1,
+                            "epoch": epoch + 1
+                        })
+        
+        # Close progress bar
+        progress_bar.close()
         
         return self.predictor  # type: ignore
     
