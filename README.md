@@ -168,7 +168,7 @@ python -c "import sparse_transformers; print('✅ Installation successful!')"
 
 ## Community engagement
 We welcome any feedback or suggestions - please join our
-[Discord](https://discord.gg/CxzDDffR) to engage with the community.
+[Discord](https://discord.gg/y8WkMncstk) to engage with the community.
 
 ## Contributing
 We welcome contributions from the community! Areas of particular interest are:
