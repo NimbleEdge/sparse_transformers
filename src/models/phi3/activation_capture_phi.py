@@ -1,6 +1,8 @@
 from src.activation_capture import ActivationCapture
 import torch.nn.functional as F
 
+
+
 class ActivationCapturePhi3(ActivationCapture):
     """Helper class to capture activations from model layers."""
     has_gate_proj: bool = True
@@ -28,6 +30,14 @@ class ActivationCapturePhi3(ActivationCapture):
             return output
         handle = layer.mlp.gate_up_proj.register_forward_hook(hook)
         return handle
+    
+    def get_gate_activations(self, layer_idx):
+        """Get combined MLP activations for a layer."""
+        gate_key = f"{layer_idx}_gate"
+        if gate_key in self.mlp_activations:
+            gate_act = self.mlp_activations[gate_key]
+            return F.silu(gate_act)
+        return None
         
     def get_mlp_activations(self, layer_idx):
         """Get combined MLP activations for a layer."""
