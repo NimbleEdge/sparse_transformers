@@ -2,14 +2,14 @@ import logging
 import os
 import csv
 import numpy as np
-from typing import Dict, Optional, List, Any
+from typing import Dict, Optional, Any
 
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset as TorchDataset
-from transformers.optimization import get_linear_schedule_with_warmup
+from transformers.optimization import get_cosine_schedule_with_warmup
 
 
 import wandb
@@ -279,6 +279,8 @@ class LayerwisePredictorTrainer:
                 intermediate_size=self.intermediate_size,
                 lora_size=lora_size
             ).to(device)
+        # self.predictor._fix_unloaded_weights()
+        self.loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([3,7]))
     
     def compute_loss(self, 
                     hidden_states: torch.Tensor,
@@ -286,12 +288,8 @@ class LayerwisePredictorTrainer:
         """Compute predictor loss."""
         # Get predictor scores
         pred_scores = self.predictor(hidden_states)  # [batch_size, intermediate_size]
-        
-        # Get top-k indices from ground truth
         gt_mask = (mlp_activations > 0).float()
-        # Compute binary cross-entropy loss
-        loss = F.binary_cross_entropy_with_logits(pred_scores, gt_mask)
-        
+        loss = self.loss_fn(pred_scores, gt_mask)
         return loss
     
     def evaluate_predictor(self, 
@@ -349,7 +347,8 @@ class LayerwisePredictorTrainer:
                    val_dataset: TorchDataset, num_epochs: int,
                    batch_size: int, learning_rate: float,
                    use_wandb: bool = False, save_dir: Optional[str] = None,
-                   save_interval: int = 1000) -> FastLoRAProjection:
+                   save_interval: int = 1000, resume_from_checkpoint: bool = False,
+                   checkpoint_path: Optional[str] = None) -> FastLoRAProjection:
         """Train a single layer's predictor.
         
         Args:
@@ -361,6 +360,8 @@ class LayerwisePredictorTrainer:
             use_wandb: Whether to log to Weights & Biases
             save_dir: Directory to save checkpoints and best model (optional)
             save_interval: Save checkpoint every N steps
+            resume_from_checkpoint: Whether to resume from latest checkpoint
+            checkpoint_path: Specific checkpoint path to resume from (optional)
         """
         
         logger.info(f"Training predictor for layer {self.layer_idx}")
@@ -379,20 +380,44 @@ class LayerwisePredictorTrainer:
         
         # Setup scheduler
         total_steps = len(train_loader) * num_epochs
-        scheduler = get_linear_schedule_with_warmup(
+        scheduler = get_cosine_schedule_with_warmup(
             optimizer,
-            num_warmup_steps=int(0.05 * total_steps),
-            num_training_steps=total_steps
+            num_warmup_steps=int(0.1 * total_steps),
+            num_training_steps=total_steps,
+            num_cycles=10
         )
         
         best_f1 = 0.0
         global_step = 0
+        start_epoch = 0
+        
+        # Handle checkpoint resuming
+        if resume_from_checkpoint:
+            resume_checkpoint_path = checkpoint_path
+            if not resume_checkpoint_path and save_dir:
+                resume_checkpoint_path = self.find_latest_checkpoint(save_dir)
+            
+            if resume_checkpoint_path:
+                try:
+                    checkpoint_data = self.load_checkpoint(resume_checkpoint_path, optimizer, scheduler)
+                    global_step = checkpoint_data['global_step']
+                    start_epoch = checkpoint_data['epoch']
+                    best_f1 = checkpoint_data['best_f1']
+                    logger.info(f"Resumed training from step {global_step}, epoch {start_epoch}, best_f1: {best_f1:.4f}")
+                except Exception as e:
+                    logger.warning(f"Failed to load checkpoint: {e}. Starting fresh training.")
+                    global_step = 0
+                    start_epoch = 0
+                    best_f1 = 0.0
+            else:
+                logger.info("No checkpoint found. Starting fresh training.")
         
         # Calculate total steps for progress bar
         total_steps = len(train_loader) * num_epochs
         progress_bar = tqdm(total=total_steps, desc=f"Training Layer {self.layer_idx}")
+        progress_bar.update(global_step)  # Update progress bar to current position
         
-        for epoch in range(num_epochs):
+        for epoch in range(start_epoch, num_epochs):
             epoch_loss = 0.0
             
             for batch in train_loader:
@@ -424,18 +449,20 @@ class LayerwisePredictorTrainer:
                 
                 # Log to wandb
                 if use_wandb and global_step % 50 == 0:
+                    # Compute gradient norm safely
+                    grad_norms = [p.grad.norm() for p in predictor.parameters() if p.grad is not None]
+                    grad_norm = torch.norm(torch.stack(grad_norms)) if grad_norms else 0.0
+                    
                     wandb.log({
                         f"layer_{self.layer_idx}/train_loss": loss.item(),
                         f"layer_{self.layer_idx}/learning_rate": scheduler.get_last_lr()[0],
-                        f"layer_{self.layer_idx}/gradient_norm": torch.norm(torch.stack([p.grad.norm() for p in predictor.parameters()])),
+                        f"layer_{self.layer_idx}/gradient_norm": grad_norm,
                         "step": global_step
                     })
                 
                 # Save checkpoint at regular intervals
                 if save_dir and global_step % save_interval == 0:
-                    checkpoint_name = f"checkpoint_layer_{self.layer_idx}_step_{global_step}"
-                    self.save_predictor(save_dir, name=checkpoint_name)
-                    logger.info(f"Saved checkpoint at step {global_step}: {checkpoint_name}")
+                    self.save_checkpoint(save_dir, global_step, epoch, optimizer, scheduler, best_f1, loss.item())
             
             # Evaluation
             eval_metrics = self.evaluate_predictor(val_loader)
@@ -479,4 +506,103 @@ class LayerwisePredictorTrainer:
                       os.path.join(save_dir, f"{name}.pt"))
         
         logger.info(f"Saved predictors to {save_dir}")
+
+    def save_checkpoint(self, save_dir: str, global_step: int, epoch: int, 
+                       optimizer: torch.optim.Optimizer, scheduler, 
+                       best_f1: float, loss: float):
+        """Save training checkpoint with full state."""
+        os.makedirs(save_dir, exist_ok=True)
+        
+        checkpoint = {
+            'global_step': global_step,
+            'epoch': epoch,
+            'predictor_state_dict': self.predictor.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'scheduler_state_dict': scheduler.state_dict(),
+            'best_f1': best_f1,
+            'loss': loss,
+            'layer_idx': self.layer_idx,
+            'hidden_size': self.hidden_size,
+            'intermediate_size': self.intermediate_size,
+        }
+        
+        checkpoint_path = os.path.join(save_dir, f"checkpoint_layer_{self.layer_idx}_step_{global_step}.pt")
+        torch.save(checkpoint, checkpoint_path)
+        
+        # Also save as latest checkpoint
+        latest_path = os.path.join(save_dir, f"latest_checkpoint_layer_{self.layer_idx}.pt")
+        torch.save(checkpoint, latest_path)
+        
+        logger.info(f"Saved checkpoint at step {global_step} to {checkpoint_path}")
+
+    def load_checkpoint(self, checkpoint_path: str, optimizer: torch.optim.Optimizer, scheduler):
+        """Load training checkpoint and restore full state."""
+        if not os.path.exists(checkpoint_path):
+            raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+        
+        logger.info(f"Loading checkpoint from {checkpoint_path}")
+        checkpoint = torch.load(checkpoint_path, map_location=self.device)
+        
+        # Load predictor state
+        self.predictor.load_state_dict(checkpoint['predictor_state_dict'])
+        
+        # Load optimizer and scheduler state
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        
+        # Return checkpoint metadata
+        return {
+            'global_step': checkpoint['global_step'],
+            'epoch': checkpoint['epoch'],
+            'best_f1': checkpoint['best_f1'],
+            'loss': checkpoint['loss']
+        }
+
+    def find_latest_checkpoint(self, save_dir: str) -> Optional[str]:
+        """Find the latest checkpoint file in the save directory."""
+        if not os.path.exists(save_dir):
+            return None
+            
+        # First try the latest checkpoint file
+        latest_path = os.path.join(save_dir, f"latest_checkpoint_layer_{self.layer_idx}.pt")
+        if os.path.exists(latest_path):
+            return latest_path
+        
+        # Otherwise, find the checkpoint with the highest step number
+        import glob
+        pattern = os.path.join(save_dir, f"checkpoint_layer_{self.layer_idx}_step_*.pt")
+        checkpoints = glob.glob(pattern)
+        
+        if not checkpoints:
+            return None
+        
+        # Extract step numbers and find the latest
+        latest_step = -1
+        latest_checkpoint = None
+        
+        for checkpoint_path in checkpoints:
+            try:
+                # Extract step number from filename
+                filename = os.path.basename(checkpoint_path)
+                step_str = filename.split('_step_')[1].split('.')[0]
+                step = int(step_str)
+                
+                if step > latest_step:
+                    latest_step = step
+                    latest_checkpoint = checkpoint_path
+                    
+            except (IndexError, ValueError):
+                continue
+        
+        return latest_checkpoint
+
+    def load_predictor(self, save_dir: str, name: str = "predictor"):
+        """Load a trained predictor from file."""
+        predictor_path = os.path.join(save_dir, f"{name}.pt")
+        if not os.path.exists(predictor_path):
+            raise FileNotFoundError(f"Predictor not found: {predictor_path}")
+        
+        logger.info(f"Loading predictor from {predictor_path}")
+        self.predictor.load_state_dict(torch.load(predictor_path, map_location=self.device))
+        logger.info(f"Successfully loaded predictor from {predictor_path}")
 

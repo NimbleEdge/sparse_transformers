@@ -7,6 +7,7 @@ based on the hidden states before each MLP layer. Uses the last token representa
 from the generated datasets.
 
 Usage:
+    # Start fresh training
     python train.py \
         --config meta-llama/Llama-2-7b-hf \
         --dataset_dir ./data/c4 \
@@ -15,10 +16,34 @@ Usage:
         --batch_size 32 \
         --num_epochs 10 \
         --learning_rate 1e-5
+    
+    # Resume from latest checkpoint
+    python train.py \
+        --config meta-llama/Llama-2-7b-hf \
+        --dataset_dir ./data/c4 \
+        --output_dir ./trained_predictors \
+        --layer_idx 0 \
+        --batch_size 32 \
+        --num_epochs 10 \
+        --learning_rate 1e-5 \
+        --resume_from_checkpoint
+    
+    # Resume from specific checkpoint
+    python train.py \
+        --config meta-llama/Llama-2-7b-hf \
+        --dataset_dir ./data/c4 \
+        --output_dir ./trained_predictors \
+        --layer_idx 0 \
+        --batch_size 32 \
+        --num_epochs 10 \
+        --learning_rate 1e-5 \
+        --resume_from_checkpoint \
+        --checkpoint_path ./trained_predictors/checkpoint_layer_0_step_5000.pt
 """
 
 import argparse
 import logging
+import os
 import time
 
 import torch
@@ -50,6 +75,8 @@ def main():
     parser.add_argument("--cache_size", type=int, default=50, help="Number of .npz chunk files to cache in memory")
     parser.add_argument("--load_full_dataset", action="store_true", help="Load full dataset into memory at initialization (faster but uses more memory)")
     parser.add_argument("--checkpoint_save_interval", type=int, default=1000, help="Save checkpoint every N steps")
+    parser.add_argument("--resume_from_checkpoint", action="store_true", help="Resume training from the latest checkpoint")
+    parser.add_argument("--checkpoint_path", type=str, default=None, help="Specific checkpoint path to resume from (optional)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--use_wandb", action="store_true", help="Use Weights & Biases logging")
     parser.add_argument("--wandb_project", type=str, default="llama-skip-predictors", help="W&B project name")
@@ -119,6 +146,19 @@ def main():
     logger.info(f"Using {len(train_dataset)} training samples, {len(val_dataset)} validation samples")
     logger.info(f"Checkpoints will be saved every {args.checkpoint_save_interval} steps to {args.output_dir}")
     
+    # Handle specific checkpoint path for resuming
+    if args.checkpoint_path and args.resume_from_checkpoint:
+        logger.info(f"Will attempt to resume from specific checkpoint: {args.checkpoint_path}")
+        # Temporarily override the trainer to load from specific checkpoint
+        if os.path.exists(args.checkpoint_path):
+            # This will be handled in the trainer's resume logic
+            pass
+        else:
+            logger.error(f"Specified checkpoint path does not exist: {args.checkpoint_path}")
+            return
+    elif args.resume_from_checkpoint:
+        logger.info("Will attempt to resume from latest checkpoint")
+    
     # Train predictor
     trainer.train_layer(
         train_dataset=train_dataset,
@@ -128,7 +168,9 @@ def main():
         learning_rate=args.learning_rate,
         use_wandb=args.use_wandb,
         save_dir=args.output_dir,
-        save_interval=args.checkpoint_save_interval
+        save_interval=args.checkpoint_save_interval,
+        resume_from_checkpoint=args.resume_from_checkpoint,
+        checkpoint_path=args.checkpoint_path
     )
             
     # Save final predictor
