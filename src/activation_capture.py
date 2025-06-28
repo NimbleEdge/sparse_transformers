@@ -30,13 +30,6 @@ class ActivationCapture:
                     self._create_mlp_hook(i, 'gate')
                 )
                 self.handles.append(handle)
-            
-            # Also capture up_proj activations
-            if hasattr(layer.mlp, 'up_proj'):
-                handle = layer.mlp.up_proj.register_forward_hook(
-                    self._create_mlp_hook(i, 'up')
-                )
-                self.handles.append(handle)
     
     def _create_hidden_state_hook(self, layer_idx):
         def hook(module, args, kwargs, output):
@@ -69,15 +62,10 @@ class ActivationCapture:
     def get_mlp_activations(self, layer_idx):
         """Get combined MLP activations for a layer."""
         gate_key = f"{layer_idx}_gate"
-        up_key = f"{layer_idx}_up"
         
-        if gate_key in self.mlp_activations and up_key in self.mlp_activations:
-            # Compute gated activations: gate(x) * up(x)
+        if gate_key in self.mlp_activations:
             gate_act = self.mlp_activations[gate_key]
-            up_act = self.mlp_activations[up_key]
-            
-            # Apply SwiGLU activation: silu(gate) * up
-            gated_act = F.silu(gate_act) * up_act
+            gated_act = F.silu(gate_act)
             return gated_act
         
         return None

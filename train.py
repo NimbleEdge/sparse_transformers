@@ -146,13 +146,6 @@ def main():
     logger.info(f"Using {len(train_dataset)} training samples, {len(val_dataset)} validation samples")
     logger.info(f"Checkpoints will be saved every {args.checkpoint_save_interval} steps to {args.output_dir}")
     
-    # Handle specific checkpoint path for resuming
-    if args.checkpoint_path and args.resume_from_checkpoint:
-        logger.info(f"Will attempt to resume from specific checkpoint: {args.checkpoint_path}")
-        os.makedirs(args.checkpoint_path, exist_ok=True)
-    elif args.resume_from_checkpoint:
-        logger.info("Will attempt to resume from latest checkpoint")
-    
     # Train predictor
     trainer.train_layer(
         train_dataset=train_dataset,

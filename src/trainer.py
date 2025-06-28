@@ -280,7 +280,6 @@ class LayerwisePredictorTrainer:
                 lora_size=lora_size
             ).to(device)
         self.predictor._init_weights()
-        self.loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([7.0/3.0]).to(device))
     
     def compute_loss(self, 
                     hidden_states: torch.Tensor,
@@ -289,7 +288,9 @@ class LayerwisePredictorTrainer:
         # Get predictor scores
         pred_scores = self.predictor(hidden_states)  # [batch_size, intermediate_size]
         gt_mask = (mlp_activations > 0).float()
-        loss = self.loss_fn(pred_scores, gt_mask)
+        weight = (gt_mask.sum() / gt_mask.numel()) + 0.005
+        loss_weight = gt_mask * (1 - weight) + weight
+        loss = F.binary_cross_entropy_with_logits(pred_scores, gt_mask, pos_weight=loss_weight)
         return loss
     
     def evaluate_predictor(self, 
@@ -303,6 +304,8 @@ class LayerwisePredictorTrainer:
         total_f1 = 0.0
         num_batches = 0
         total_accuracy = 0.0
+        total_gt_sparsity = 0.0
+        total_pred_sparsity = 0.0
         with torch.no_grad():
             for batch_idx, batch in enumerate(dataloader):
                 if batch_idx >= max_batches:
@@ -313,14 +316,15 @@ class LayerwisePredictorTrainer:
                 
                 # Get predictions
                 pred_scores = self.predictor(hidden_states)
-                pred_mask = (F.sigmoid(pred_scores) > 0.5)
+                pred_mask = (F.sigmoid(pred_scores) >= 0.5)
                 
                 # Get ground truth
                 gt_mask = (mlp_activations > 0)
                 tp = (pred_mask * gt_mask).sum().item()
                 fp = (pred_mask * (~gt_mask)).sum().item()
                 fn = ((~pred_mask) * gt_mask).sum().item()
-                
+                total_gt_sparsity += (gt_mask.sum() / gt_mask.numel())
+                total_pred_sparsity += (pred_mask.sum() / pred_mask.numel())
                 precision = tp / (tp + fp + 1e-8)
                 recall = tp / (tp + fn + 1e-8)
                 f1 = 2 * precision * recall / (precision + recall + 1e-8)
@@ -334,9 +338,11 @@ class LayerwisePredictorTrainer:
         self.predictor.train()
         
         if num_batches == 0:
-            return {"precision": 0.0, "recall": 0.0, "f1": 0.0}
+            return {"gt_sparsity": 0.0, "pred_sparsity": 0.0, "precision": 0.0, "recall": 0.0, "f1": 0.0}
         
         return {
+            "pred_sparsity": total_pred_sparsity / num_batches,
+            "gt_sparsity": total_gt_sparsity / num_batches,
             "accuracy": total_accuracy / num_batches,
             "precision": total_precision / num_batches,
             "recall": total_recall / num_batches,
@@ -547,8 +553,8 @@ class LayerwisePredictorTrainer:
         self.predictor.load_state_dict(checkpoint['predictor_state_dict'])
         
         # Load optimizer and scheduler state
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+        # optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        # scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
         
         # Return checkpoint metadata
         return {

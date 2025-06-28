@@ -45,10 +45,10 @@ class FastLoRAProjection(nn.Module):
     def _init_weights(self):
         with torch.no_grad():
             torch.nn.init.xavier_normal_(self.down.weight)
-            torch.nn.init.zeros_(self.up.weight)
+            torch.nn.init.xavier_normal_(self.up.weight)
    
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.mm(torch.mm(x, self.down.weight.t()), self.up.weight.t())
+        return self.up(self.down(x))
                      
 class SkipMLP(nn.Module):
     def __init__(self, hidden_size: int, intermediate_size: int, sparsity: float, bias: bool = False):

@@ -52,7 +52,7 @@ from tqdm import tqdm
 from src.activation_capture import ActivationCapture
 import csv
 import glob
-from src.predictor_trainer import get_sample_by_index
+from src.trainer import get_sample_by_index
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -144,14 +144,13 @@ def process_batch(
         # Collect last token activations for each layer
         for layer_idx in range(num_layers):
             if layer_idx in capture.hidden_states:
-                # Extract only the last token's hidden state [-1, :]
-                hidden_state = capture.hidden_states[layer_idx][batch_idx,-1,:].cpu().numpy().astype(np.float32)
+                hidden_state = capture.hidden_states[layer_idx][batch_idx].cpu().numpy().astype(np.float32)
                 hidden_states_dict[layer_idx].append(hidden_state)
                 
                 # Get last token's MLP activations
                 mlp_activation = capture.get_mlp_activations(layer_idx)
                 if mlp_activation is not None:
-                    mlp_act = mlp_activation[batch_idx,-1,:].cpu().numpy().astype(np.float32)
+                    mlp_act = mlp_activation[batch_idx].cpu().numpy().astype(np.float32)
                     mlp_activations_dict[layer_idx].append(mlp_act)
     
     # Clear GPU tensors from capture to free memory
@@ -167,8 +166,6 @@ def generate_dataset(
     dataset_name: str,
     dataset_config: Optional[str],
     output_dir: str,
-    max_length: int,
-    batch_size: int,
     device: torch.device,
     save_interval: int = 1000,
     num_workers: int = 4,
@@ -208,80 +205,32 @@ def generate_dataset(
     # Load dataset
     logger.info(f"Loading dataset: {dataset_name}")
     if dataset_config:
-        raw_dataset = load_dataset(dataset_name, dataset_config, split="train", streaming=False)
+        dataset = load_dataset(dataset_name, dataset_config, split="train", streaming=True)
     else:
-        raw_dataset = load_dataset(dataset_name, split="train", streaming=False)
-    
-    # Ensure we have a Dataset object (not DatasetDict)
-    from datasets import Dataset as HFDataset
-    if isinstance(raw_dataset, HFDataset):
-        dataset = raw_dataset
-    else:
-        raise ValueError("Expected a Dataset object, got: " + type(raw_dataset).__name__)
+        dataset = load_dataset(dataset_name, split="train", streaming=True)
+    dataset = dataset.shuffle(buffer_size=10000, seed=42)
 
     def sample_and_tokenize(examples):
         """Sample text chunks before tokenization for efficiency using vectorized operations."""
         texts = examples["text"]
-        chars_per_token = 4
-        target_chars = max_length * chars_per_token * 2
-        
-        # Vectorized length calculation
-        text_lengths = np.array([len(text) for text in texts])
-        
-        # Process all texts
-        sampled_texts = []
-        for idx in range(len(texts)):
-            text = texts[idx]
-            text_len = text_lengths[idx]
-            
-            if text_len > target_chars:
-                # Vectorized random sampling
-                max_start = text_len - target_chars
-                start_idx = np.random.randint(0, max_start + 1)
-                
-                # Simple word boundary adjustment (simplified for speed)
-                # Find space before start_idx
-                space_before = text.rfind(' ', 0, start_idx + 1)
-                start_idx = space_before + 1 if space_before != -1 else start_idx
-                
-                # Find space after end_idx
-                end_idx = min(int(start_idx + target_chars), int(text_len))
-                space_after = text.find(' ', end_idx - 1)
-                end_idx = space_after if space_after != -1 else end_idx
-                
-                sampled_texts.append(text[start_idx:end_idx].strip())
-            else:
-                sampled_texts.append(text)
-        
-        # Batch tokenization - much faster than individual tokenization
-        if not sampled_texts:
-            return {"text": [], "input_ids": [], "attention_mask": []}
-            
         tokenized = tokenizer(
-            sampled_texts,
-            padding="max_length",
-            truncation=True,
-            max_length=max_length,
+            texts,
+            padding=True,
             return_tensors="pt"  # Return numpy arrays for faster operations
         )
         
         # Convert to lists
         return {
-            "text": sampled_texts,
+            "text": texts,
             "input_ids": tokenized["input_ids"],
             "attention_mask": tokenized["attention_mask"]
         }
-        
-    num_samples = min(max_samples, len(dataset))
-    logger.info(f"Processing {num_samples} samples from dataset")
     
-    # Select subset and tokenize
-    dataset = dataset.select(range(num_samples))
-    dataset = dataset.map(sample_and_tokenize, batched=True)
+    # Tokenize
+    dataset = dataset.take(max_samples).map(sample_and_tokenize, batched=True)
     dataset = dataset.with_format("torch")
     
-    # Create DataLoader with num_workers=0 to avoid shared memory issues
-    dataloader = TorchDataLoader(dataset, batch_size=batch_size, num_workers=0, pin_memory=False)  # type: ignore
+    dataloader = TorchDataLoader(dataset, batch_size=4, num_workers=0, pin_memory=False)  # type: ignore
     # Storage for collected data
     texts_list = []
     input_ids_list = []
@@ -289,12 +238,11 @@ def generate_dataset(
     mlp_activations_dict = {i: [] for i in range(num_layers)}
     attention_mask_list = []
     # Process samples
-    logger.info(f"Using batch size: {batch_size}")
     
     # Process in larger batches for efficiency
     with torch.no_grad():
         # Process samples in batches
-        for batch in tqdm(dataloader, desc="Processing batches", total=len(dataloader)):            
+        for batch in tqdm(dataloader, desc="Processing batches", total=max_samples):            
             # Process batch
             input_ids_list_, attention_mask_list_, hidden_states_dict_, mlp_activations_dict_ = process_batch(
                 batch, model, capture, device, num_layers
@@ -363,11 +311,9 @@ def generate_dataset(
         "dataset_name": dataset_name,
         "dataset_config": dataset_config,
         "num_samples": total_samples,
-        "max_length": max_length,
         "num_layers": num_layers,
         "hidden_dim": hidden_dim,
         "intermediate_dim": intermediate_dim,
-        "batch_size": batch_size,
     }
     
     with open(os.path.join(output_dir, "metadata.json"), "w") as f:
@@ -464,16 +410,12 @@ def main():
                        help="Name or path of the base model (e.g., meta-llama/Llama-2-7b-hf)")
     parser.add_argument("--dataset", type=str, default="allenai/c4",
                        help="Dataset name (default: allenai/c4)")
-    parser.add_argument("--dataset_config", type=str, default="realnewslike",
-                       help="Dataset configuration (e.g., realnewslike for C4)")
+    parser.add_argument("--dataset_config", type=str, default="en",
+                       help="Dataset configuration (e.g., en for C4)")
     parser.add_argument("--output_dir", type=str, required=True,
                        help="Output directory for generated dataset")
-    parser.add_argument("--max_length", type=int, default=256,
-                       help="Maximum sequence length")
     parser.add_argument("--max_samples", type=int, default=100000,
                        help="Maximum number of samples to process")
-    parser.add_argument("--batch_size", type=int, default=4,
-                       help="Batch size for processing")
     parser.add_argument("--save_interval", type=int, default=1000,
                        help="Save intermediate results every N samples")
     parser.add_argument("--num_workers", type=int, default=4,
@@ -547,8 +489,6 @@ def main():
         dataset_name=args.dataset,
         dataset_config=args.dataset_config,
         output_dir=args.output_dir,
-        max_length=args.max_length,
-        batch_size=args.batch_size,
         device=device,
         save_interval=args.save_interval,
         num_workers=args.num_workers,
