@@ -22,6 +22,9 @@ class ActivationCaptureOPT(ActivationCapture):
             self._create_mlp_hook(layer_idx, 'gate')
         )
         return handle
+    
+    def _register_up_hook(self, layer_idx, layer):
+        pass
         
     def get_mlp_activations(self, layer_idx):
         """Get combined MLP activations for a layer."""

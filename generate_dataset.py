@@ -197,7 +197,7 @@ def generate_dataset(
     model.eval()
     
     # Setup activation capture
-    capture_cls = ACTIVATION_CAPTURE[model.config.model_name]
+    capture_cls = ACTIVATION_CAPTURE[model.config.model_type]
     capture = capture_cls()
     capture.register_hooks(model)
 
