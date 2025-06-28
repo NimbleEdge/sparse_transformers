@@ -49,7 +49,7 @@ from transformers.trainer_utils import set_seed
 from datasets import load_dataset
 from torch.utils.data import DataLoader as TorchDataLoader
 from tqdm import tqdm
-from src.activation_capture import ActivationCapture
+from src.activation_capture import ACTIVATION_CAPTURE, ActivationCapture
 import csv
 import glob
 from src.predictor_trainer import get_sample_by_index
@@ -196,14 +196,15 @@ def generate_dataset(
     
     model.eval()
     
+    # Setup activation capture
+    capture_cls = ACTIVATION_CAPTURE[model.config.model_name]
+    capture = capture_cls()
+    capture.register_hooks(model)
+
     # Get model dimensions
     hidden_dim = model.config.hidden_size
     intermediate_dim = model.config.intermediate_size
-    num_layers = len(model.model.layers)
-    
-    # Setup activation capture
-    capture = ActivationCapture()
-    capture.register_hooks(model)
+    num_layers = len(capture.get_layers(model))
     
     # Load dataset
     logger.info(f"Loading dataset: {dataset_name}")
