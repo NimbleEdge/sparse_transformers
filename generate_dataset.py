@@ -132,12 +132,12 @@ def process_batch(
     mlp_activations_dict = {i: [] for i in range(num_layers)}
     attention_mask_list = []
     # Move attention mask to CPU once
-    attention_mask_np = attention_mask.cpu().numpy().astype(np.int8)
+    attention_mask_np = attention_mask.clone().detach().cpu().numpy().astype(np.int8)
     
     # Process each sample in the batch
     for batch_idx in range(batch_size):
         # Extract input_ids for this sample
-        input_ids_sample = input_ids[batch_idx].cpu().numpy().astype(np.int32)
+        input_ids_sample = input_ids[batch_idx].clone().detach().cpu().numpy().astype(np.int32)
         input_ids_list.append(input_ids_sample)
         attention_mask_list.append(attention_mask_np[batch_idx])
         
@@ -168,8 +168,7 @@ def generate_dataset(
     output_dir: str,
     device: torch.device,
     save_interval: int = 1000,
-    num_workers: int = 4,
-    prefetch_batches: int = 2,
+    batch_size: int = 4,
     max_samples: int = 100000,
 ):
     """Generate predictor training dataset with optimizations."""
@@ -216,7 +215,7 @@ def generate_dataset(
         tokenized = tokenizer(
             texts,
             padding=True,
-            return_tensors="pt"  # Return numpy arrays for faster operations
+            return_tensors="pt"
         )
         
         # Convert to lists
@@ -230,7 +229,7 @@ def generate_dataset(
     dataset = dataset.take(max_samples).map(sample_and_tokenize, batched=True)
     dataset = dataset.with_format("torch")
     
-    dataloader = TorchDataLoader(dataset, batch_size=4, num_workers=0, pin_memory=False)  # type: ignore
+    dataloader = TorchDataLoader(dataset, batch_size=batch_size, num_workers=8, pin_memory=False, prefetch_factor=2)  # type: ignore
     # Storage for collected data
     texts_list = []
     input_ids_list = []
@@ -418,10 +417,8 @@ def main():
                        help="Maximum number of samples to process")
     parser.add_argument("--save_interval", type=int, default=1000,
                        help="Save intermediate results every N samples")
-    parser.add_argument("--num_workers", type=int, default=4,
-                       help="Number of workers for data loading")
-    parser.add_argument("--prefetch_batches", type=int, default=2,
-                       help="Number of batches to prefetch")
+    parser.add_argument("--batch_size", type=int, default=4,
+                       help="Batch size for processing")
     parser.add_argument("--seed", type=int, default=42,
                        help="Random seed")
     parser.add_argument("--device", type=str, default="auto",
@@ -491,8 +488,7 @@ def main():
         output_dir=args.output_dir,
         device=device,
         save_interval=args.save_interval,
-        num_workers=args.num_workers,
-        prefetch_batches=args.prefetch_batches,
+        batch_size=args.batch_size,
         max_samples=args.max_samples,
     )
 
