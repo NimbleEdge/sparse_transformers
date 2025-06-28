@@ -1,12 +1,10 @@
 from transformers import LlamaConfig
 from optimum.utils import NormalizedTextConfig, MistralDummyPastKeyValuesGenerator, DummyTextInputGenerator
-import os
-from typing import Union, Any
 from optimum.exporters.onnx.config import TextDecoderWithPositionIdsOnnxConfig
 from src.configuration_skip import build_skip_config
 
 
-LlamaSkipConnectionConfig: type[LlamaConfig] = build_skip_config(LlamaConfig, "llama-skip")
+LlamaSkipConnectionConfig = build_skip_config(LlamaConfig, "llama-skip")
 
 
 class LlamaOnnxConfig(TextDecoderWithPositionIdsOnnxConfig):

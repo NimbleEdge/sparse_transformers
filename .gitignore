@@ -21,6 +21,7 @@ wheels/
 .installed.cfg
 *.egg
 .cursorrules
+trained_predictors/
 wandb/
 # CUDA
 *.i
@@ -87,6 +88,7 @@ coverage.xml
 # Logs and databases
 *.sqlite
 *.db
+data/
 
 # OS generated files
 .DS_Store

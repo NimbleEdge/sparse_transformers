@@ -1,40 +1,23 @@
-import math
-from typing import Callable, Optional, Tuple, Union
+from typing import Union
 
 import torch
-import torch.nn.functional as F
 from torch import nn
 
-from transformers.modeling_outputs import (
-    CausalLMOutputWithPast,
-    ModelOutput
-)
-
 from transformers.modeling_attn_mask_utils import AttentionMaskConverter
-from transformers.processing_utils import Unpack
-from transformers.modeling_layers import GradientCheckpointingLayer
-from transformers.utils import logging, is_torch_flex_attn_available
-from transformers.cache_utils import Cache, DynamicCache, SlidingWindowCache, StaticCache
-from transformers.generation import GenerationMixin
+from transformers.utils import logging
+from transformers.cache_utils import Cache, SlidingWindowCache, StaticCache
 from transformers.modeling_utils import PreTrainedModel
-
-
-from transformers.models.qwen2.modeling_qwen2 import(
-    Qwen2MLP, Qwen2Attention, Qwen2RMSNorm, Qwen2RotaryEmbedding,
-    KwargsForCausalLM, FlashAttentionKwargs
-)
+from transformers.utils.import_utils import is_torch_flex_attn_available
 
 if is_torch_flex_attn_available():
     from torch.nn.attention.flex_attention import BlockMask
 
     from transformers.integrations.flex_attention import make_flex_block_causal_mask
 
-# Import C++ extensions
-from sparse_transformers import (
-    sparse_mlp_forward,
-    WeightCache,
-    approx_topk_threshold
+from transformers.models.qwen2.modeling_qwen2 import(
+    Qwen2MLP, Qwen2Attention, Qwen2RMSNorm, Qwen2RotaryEmbedding,
 )
+
 
 from src.models.qwen2.configuration_qwen_skip import Qwen2SkipConnectionConfig
 from src.modeling_skip import SkipMLP, SkipDecoderLayer, build_skip_connection_model, build_skip_connection_model_for_causal_lm
@@ -43,20 +26,20 @@ logger = logging.get_logger(__name__)
 
 
 class Qwen2SkipDecoderLayer(SkipDecoderLayer):
-    def _init_components(self, config: Qwen2SkipConnectionConfig, layer_idx: int):
+    def _init_components(self, config, layer_idx):
         self.self_attn = Qwen2Attention(config=config, layer_idx=layer_idx)
         self.input_layernorm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         if config.use_sliding_window and config._attn_implementation != "flash_attention_2":
-            logger.warning_once(
+            logger.warning(
                 f"Sliding Window Attention is enabled but not implemented for `{config._attn_implementation}`; "
                 "unexpected results may be encountered."
             )
 
-    def _set_mlp_train(self, config: Qwen2SkipConnectionConfig):
+    def _set_mlp_train(self, config):
         self.mlp = Qwen2MLP(config)
 
-    def _set_mlp_inference(self, config: Qwen2SkipConnectionConfig):
+    def _set_mlp_inference(self, config):
         self.mlp = SkipMLP(
             config.hidden_size,
             config.intermediate_size,
@@ -92,11 +75,11 @@ class Qwen2SkipPreTrainedModel(PreTrainedModel):
             module.weight.data.fill_(1.0)
 
 
-Qwen2SkipConnectionModelBase: type[Qwen2SkipPreTrainedModel] = build_skip_connection_model(Qwen2SkipPreTrainedModel)
+Qwen2SkipConnectionModelBase = build_skip_connection_model(Qwen2SkipPreTrainedModel)
 
 class Qwen2SkipConnectionModel(Qwen2SkipConnectionModelBase):
-    def _init_components(self, config: Qwen2SkipConnectionConfig):
-        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx)
+    def _init_components(self, config):
+        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, self.padding_idx) # type: ignore
         self.layers = nn.ModuleList(
             [Qwen2SkipDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
         )
@@ -197,7 +180,7 @@ class Qwen2SkipConnectionModel(Qwen2SkipConnectionModelBase):
         dtype: torch.dtype,
         cache_position: torch.Tensor,
         batch_size: int,
-        config: Qwen2SkipConnectionConfig,
+        config,
         past_key_values: Cache,
     ):
         """
@@ -258,7 +241,4 @@ class Qwen2SkipConnectionModel(Qwen2SkipConnectionModelBase):
                 )
         return causal_mask
     
-Qwen2SkipConnectionForCausalLM: type[Qwen2SkipPreTrainedModel] = \
-    build_skip_connection_model_for_causal_lm(Qwen2SkipPreTrainedModel, Qwen2SkipConnectionModel)
-    
-__all__ = [Qwen2SkipConnectionForCausalLM]
+Qwen2SkipConnectionForCausalLM = build_skip_connection_model_for_causal_lm(Qwen2SkipPreTrainedModel, Qwen2SkipConnectionModel)

@@ -70,7 +70,7 @@ Sparse LLaMA 3.2 3B vs Standard LLaMA 3.2 3B CUDA Results (on HuggingFace Implem
 ```bash
 # Run comprehensive benchmark
 
-python run_benchmark.py \
+python benchmark.py \
     --device cpu \                              # Device: 'cpu' or 'cuda'
     --config configs/llama_skip_causal_3b.json \ # Model configuration
     --num_runs 50 \                            # Number of benchmark runs
@@ -168,7 +168,7 @@ python -c "import sparse_transformers; print('✅ Installation successful!')"
 
 ## Community engagement
 We welcome any feedback or suggestions - please join our
-[Discord](https://discord.gg/CxzDDffR) to engage with the community.
+[Discord](https://discord.gg/y8WkMncstk) to engage with the community.
 
 ## Contributing
 We welcome contributions from the community! Areas of particular interest are:

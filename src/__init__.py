@@ -1,3 +1,2 @@
-from .models import llama
+from . import models
 from . import utilities
-from . import trainer
