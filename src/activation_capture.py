@@ -75,6 +75,11 @@ class ActivationCapture(ABC):
         """Get combined MLP activations for a layer."""
         pass
 
+    @abstractmethod
+    def get_gate_activations(self, layer_idx):
+        """Get combined MLP activations for a layer."""
+        return 
+
 
 class ActivationCaptureDefault(ActivationCapture):
     """Helper class to capture activations from model layers."""
@@ -118,6 +123,14 @@ class ActivationCaptureDefault(ActivationCapture):
             gated_act = F.silu(gate_act) * up_act
             return gated_act
         
+        return None
+    
+    def get_gate_activations(self, layer_idx):
+        """Get combined MLP activations for a layer."""
+        gate_key = f"{layer_idx}_gate"
+        if gate_key in self.mlp_activations:
+            gate_act = self.mlp_activations[gate_key]
+            return F.silu(gate_act)
         return None
     
 

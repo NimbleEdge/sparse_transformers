@@ -149,7 +149,7 @@ def process_batch(
                 hidden_states_dict[layer_idx].append(hidden_state)
                 
                 # Get last token's MLP activations
-                mlp_activation = capture.get_mlp_activations(layer_idx)
+                mlp_activation = capture.get_gate_activations(layer_idx)
                 if mlp_activation is not None:
                     mlp_act = mlp_activation[batch_idx,-1,:].cpu().numpy().astype(np.float32)
                     mlp_activations_dict[layer_idx].append(mlp_act)

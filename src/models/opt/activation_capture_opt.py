@@ -24,18 +24,15 @@ class ActivationCaptureOPT(ActivationCapture):
         return handle
     
     def _register_up_hook(self, layer_idx, layer):
-        pass
-        
-    def get_mlp_activations(self, layer_idx):
+        return None
+
+    def get_gate_activations(self, layer_idx):
         """Get combined MLP activations for a layer."""
         gate_key = f"{layer_idx}_gate"
-        
         if gate_key in self.mlp_activations:
-            # Compute gated activations: gate(x) * up(x)
             gate_act = self.mlp_activations[gate_key]
-            
-            # Apply SwiGLU activation: silu(gate) * up
-            gated_act = F.relu(gate_act) 
-            return gated_act
+            return F.relu(gate_act)
+        return None
         
+    def get_mlp_activations(self, layer_idx):
         return None
