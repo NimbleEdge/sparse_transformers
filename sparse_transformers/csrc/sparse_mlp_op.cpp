@@ -19,8 +19,10 @@ namespace py = pybind11;
 #include <thread>
 #include <mutex>
 
-// Add device check utilities
+// Add device check utilities (only if not CPU-only build)
+#ifndef CPU_ONLY
 #include <c10/cuda/CUDAGuard.h>
+#endif
 
 // Add custom headers
 #include "weight_cache.h"
