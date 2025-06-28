@@ -279,8 +279,8 @@ class LayerwisePredictorTrainer:
                 intermediate_size=self.intermediate_size,
                 lora_size=lora_size
             ).to(device)
-        # self.predictor._fix_unloaded_weights()
-        self.loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([3,7]))
+        self.predictor._init_weights()
+        self.loss_fn = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([7.0/3.0]).to(device))
     
     def compute_loss(self, 
                     hidden_states: torch.Tensor,
@@ -384,7 +384,7 @@ class LayerwisePredictorTrainer:
             optimizer,
             num_warmup_steps=int(0.1 * total_steps),
             num_training_steps=total_steps,
-            num_cycles=10
+            num_cycles=1.5
         )
         
         best_f1 = 0.0

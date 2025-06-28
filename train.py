@@ -149,13 +149,7 @@ def main():
     # Handle specific checkpoint path for resuming
     if args.checkpoint_path and args.resume_from_checkpoint:
         logger.info(f"Will attempt to resume from specific checkpoint: {args.checkpoint_path}")
-        # Temporarily override the trainer to load from specific checkpoint
-        if os.path.exists(args.checkpoint_path):
-            # This will be handled in the trainer's resume logic
-            pass
-        else:
-            logger.error(f"Specified checkpoint path does not exist: {args.checkpoint_path}")
-            return
+        os.makedirs(args.checkpoint_path, exist_ok=True)
     elif args.resume_from_checkpoint:
         logger.info("Will attempt to resume from latest checkpoint")
     

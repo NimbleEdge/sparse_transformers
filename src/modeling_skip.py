@@ -36,13 +36,16 @@ class FastLoRAProjection(nn.Module):
         # Force creation of linear layers with actual tensors (not meta tensors)
         self.down = nn.Linear(hidden_size, lora_size, bias=False)
         self.up = nn.Linear(lora_size, intermediate_size, bias=False)
-    
+
     def _fix_unloaded_weights(self):
         out = self.to_empty(device="cpu")
-        with torch.no_grad():
-            torch.nn.init.xavier_normal_(out.down.weight)
-            torch.nn.init.zeros_(out.up.weight)  # Initialize up projection to zeros for stable training
+        self._init_weights()
         return out
+
+    def _init_weights(self):
+        with torch.no_grad():
+            torch.nn.init.xavier_normal_(self.down.weight)
+            torch.nn.init.zeros_(self.up.weight)
    
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return torch.mm(torch.mm(x, self.down.weight.t()), self.up.weight.t())
