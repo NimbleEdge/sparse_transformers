@@ -10,7 +10,7 @@ from transformers import PreTrainedModel, PretrainedConfig
 from dataclasses import dataclass
 from transformers.modeling_outputs import (
     CausalLMOutputWithPast,
-    ModelOutput
+    BaseModelOutputWithPast
 )
 from transformers.models.opt.modeling_opt import(
      OPTLearnedPositionalEmbedding, OPTAttention,
@@ -38,7 +38,7 @@ from sparse_transformers import (
 
 from src.models.opt.configuration_opt_skip import OPTSkipConnectionConfig
 from src.modeling_skip import (
-    SkipMLP, SkipDecoderLayer, BaseModelOutputWithPastAndPredictorLoss,
+    SkipMLP, SkipDecoderLayer, 
     build_skip_connection_model, build_skip_connection_model_for_causal_lm
 )
 
@@ -79,7 +79,7 @@ class OPTSkipMLP(nn.Module):
         """Tie weights after weights are loaded (called from post_init)."""
         if self.weight_cache is None:
             # Create and initialize weight cache
-            self.weight_cache = WeightCacheOPT(   
+            self.weight_cache = WeightCacheOpt(   
                 self.init_mask,
                 self.hidden_size,
                 self.up_proj.weight, 
@@ -98,7 +98,7 @@ class OPTSkipMLP(nn.Module):
         return result
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = sparse_mlp_forward_OPT(
+        out = sparse_mlp_forward_opt(
             x.detach(), 
             self.weight_cache.get_active_up_weight(),
             self.weight_cache.get_active_down_weight(),
@@ -110,7 +110,7 @@ class OPTSkipMLP(nn.Module):
     
 
 class OPTSkipDecoderLayer(SkipDecoderLayer):
-    def _init_components(self, config: OPTSkipConnectionConfig, layer_idx: int):
+    def _init_components(self, config, layer_idx):
         self.self_attn = OPTAttention(config=config, layer_idx=layer_idx)
         self.self_attn_layer_norm = nn.LayerNorm(
             self.hidden_size, elementwise_affine=config.layer_norm_elementwise_affine
@@ -131,10 +131,10 @@ class OPTSkipDecoderLayer(SkipDecoderLayer):
         del self.fc1
         del self.fc2
 
-    def _set_mlp_train(self, config: OPTSkipConnectionConfig):
+    def _set_mlp_train(self, config):
         self.mlp = OPTMLP(config)
 
-    def _set_mlp_inference(self, config: OPTSkipConnectionConfig):
+    def _set_mlp_inference(self, config):
         self.mlp = OPTSkipMLP(
             config.hidden_size,
             config.intermediate_size,
@@ -210,10 +210,6 @@ class OPTSkipDecoderLayer(SkipDecoderLayer):
             hidden_states = self.final_layer_norm(hidden_states)
 
         hidden_states = self.mlp(hidden_states)
-        if self.training and self.is_training_config:
-            predictor_loss = self.compute_predictor_loss(hidden_states)
-        else:
-            predictor_loss = None
         hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
 
         hidden_states = (residual + hidden_states).view(hidden_states_shape)
@@ -230,7 +226,7 @@ class OPTSkipDecoderLayer(SkipDecoderLayer):
         if use_cache:
             outputs += (present_key_value,)
 
-        return outputs, predictor_loss
+        return outputs
     
 
 class OPTSkipPreTrainedModel(PreTrainedModel):
@@ -264,7 +260,7 @@ class OPTSkipPreTrainedModel(PreTrainedModel):
 OPTSkipConnectionModelBase: type[OPTSkipPreTrainedModel] = build_skip_connection_model(OPTSkipPreTrainedModel)
 
 class OPTSkipConnectionModel(OPTSkipConnectionModelBase):
-    def _init_components(self, config: OPTSkipConnectionConfig):
+    def _init_components(self, config):
         self.dropout = config.dropout
         self.layerdrop = config.layerdrop
         self.padding_idx = config.pad_token_id
@@ -312,7 +308,7 @@ class OPTSkipConnectionModel(OPTSkipConnectionModelBase):
         head_mask: Optional[torch.Tensor] = None,
         return_dict: Optional[bool] = None,
         **kwargs: Unpack[FlashAttentionKwargs],
-    ) -> Union[tuple, BaseModelOutputWithPastAndPredictorLoss]:
+    ) -> Union[tuple, BaseModelOutputWithPast]:
         r"""
         Args:
             input_ids (`torch.LongTensor` of shape `(batch_size, sequence_length)`):
@@ -435,7 +431,6 @@ class OPTSkipConnectionModel(OPTSkipConnectionModelBase):
         # decoder layers
         all_hidden_states = () if output_hidden_states else None
         all_self_attns = () if output_attentions else None
-        all_predictor_losses = []  # Collect predictor losses
         next_decoder_cache = None
 
         # check if head_mask has a correct number of layers specified if desired
@@ -457,7 +452,7 @@ class OPTSkipConnectionModel(OPTSkipConnectionModelBase):
                 if dropout_probability < self.layerdrop:
                     continue
 
-            layer_outputs, predictor_loss = decoder_layer(
+            layer_outputs = decoder_layer(
                     hidden_states,
                     attention_mask=causal_mask,
                     position_ids=position_ids,
@@ -476,9 +471,6 @@ class OPTSkipConnectionModel(OPTSkipConnectionModelBase):
 
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
-                # Collect predictor loss if available
-            if predictor_loss is not None:
-                all_predictor_losses.append(predictor_loss)
 
         if self.final_layer_norm is not None:
             hidden_states = self.final_layer_norm(hidden_states)
@@ -489,17 +481,12 @@ class OPTSkipConnectionModel(OPTSkipConnectionModelBase):
         # add hidden states from the last decoder layer
         if output_hidden_states:
             all_hidden_states += (hidden_states,)
-        # Compute total predictor loss
-        total_predictor_loss = None
-        if all_predictor_losses:
-            total_predictor_loss = torch.stack(all_predictor_losses).mean()
 
         next_cache = next_decoder_cache if use_cache else None
         if return_legacy_cache:
             next_cache = next_cache.to_legacy_cache()
 
-        return BaseModelOutputWithPastAndPredictorLoss(
-            loss=total_predictor_loss,
+        return BaseModelOutputWithPast(
             last_hidden_state=hidden_states,
             past_key_values=next_cache,
             hidden_states=all_hidden_states,
@@ -633,7 +620,7 @@ class OPTSkipConnectionModel(OPTSkipConnectionModelBase):
     
 
 class OPTSkipDecoderWrapper(OPTSkipPreTrainedModel):
-    def __init__(self, config: OPTSkipConnectionConfig):
+    def __init__(self, config):
         super().__init__(config)
         self.decoder = OPTSkipConnectionModel(config)
         self.post_init()
@@ -660,7 +647,7 @@ class OPTSkipDecoderWrapper(OPTSkipPreTrainedModel):
         head_mask: Optional[torch.Tensor] = None,
         return_dict: Optional[bool] = None,
         **kwargs: Unpack[FlashAttentionKwargs],
-    ) -> Union[tuple, BaseModelOutputWithPastAndPredictorLoss]:
+    ) -> Union[tuple, BaseModelOutputWithPast]:
         return self.decoder.forward(
             input_ids=input_ids,
             attention_mask=attention_mask,
@@ -799,7 +786,7 @@ class OPTSkipConnectionForCausalLM(OPTSkipPreTrainedModel, GenerationMixin):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
-        outputs: BaseModelOutputWithPastAndPredictorLoss = self.model.decoder(
+        outputs: BaseModelOutputWithPast = self.model.decoder(
             input_ids=input_ids,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -818,7 +805,6 @@ class OPTSkipConnectionForCausalLM(OPTSkipPreTrainedModel, GenerationMixin):
         logits = self.lm_head(hidden_states).contiguous()
 
         loss = None
-        total_loss = None  
         if labels is not None:
             # move labels to correct device to enable model parallelism
             labels = labels.to(logits.device)
@@ -829,19 +815,8 @@ class OPTSkipConnectionForCausalLM(OPTSkipPreTrainedModel, GenerationMixin):
                 **kwargs,
             )
 
-            # Combine with predictor loss if in training mode
-            if outputs.loss is not None:
-                # Weight the predictor loss (can be configured)
-                predictor_weight = getattr(self.config, 'predictor_loss_weight', 0.1)
-                total_loss = loss + predictor_weight * outputs.loss
-            else:
-                total_loss = loss
-        elif outputs.loss is not None:
-            # If we're in training mode with predictor loss but no labels, use predictor loss as main loss
-            total_loss = outputs.loss
-
         return CausalLMOutputWithPast(
-            loss=total_loss,
+            loss=loss,
             logits=logits,
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
