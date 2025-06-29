@@ -91,7 +91,7 @@ def analyze_sparsity(args, model_name, device):
         tokenizer.pad_token = tokenizer.eos_token
     
     model = AutoModelForCausalLM.from_pretrained(
-        args.model_name,
+        model_name,
         torch_dtype=torch.float16 if device.type == "cuda" else torch.float32,
         device_map="auto" if device.type == "cuda" else None,
         trust_remote_code=True
@@ -119,6 +119,7 @@ def analyze_sparsity(args, model_name, device):
                 logger.info(f"Processed {batch_idx + 1}/{len(dataloader)} sequences")
 
         for key, layer_sparsities in analyzer.mlp_sparsity.items():
+            analyzer.mlp_sparsity[key] = [sum(layer_sparsities[layer_idx]) / len(layer_sparsities[layer_idx]) for layer_idx in range(len(layer_sparsities))]
             for layer_idx in range(len(layer_sparsities)):
                 analyzer.mlp_sparsity[key][layer_idx] = sum(layer_sparsities[layer_idx]) / len(layer_sparsities[layer_idx])
 
