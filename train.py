@@ -71,7 +71,7 @@ def main():
     parser.add_argument("--num_epochs", type=int, default=10, help="Number of training epochs")
     parser.add_argument("--learning_rate", type=float, default=1e-5, help="Learning rate")
     parser.add_argument("--lora_size", type=int, default=None, help="LoRA bottleneck size (default: 4% of intermediate_size)")
-    parser.add_argument("--val_split", type=float, default=0.2, help="Validation split fraction")
+    parser.add_argument("--val_split", type=float, default=0.1, help="Validation split fraction")
     parser.add_argument("--cache_size", type=int, default=50, help="Number of .npz chunk files to cache in memory")
     parser.add_argument("--load_full_dataset", action="store_true", help="Load full dataset into memory at initialization (faster but uses more memory)")
     parser.add_argument("--checkpoint_save_interval", type=int, default=1000, help="Save checkpoint every N steps")

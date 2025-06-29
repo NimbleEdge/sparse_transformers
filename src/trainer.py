@@ -243,9 +243,7 @@ class LayerwisePredictorTrainer:
         loss = F.binary_cross_entropy_with_logits(pred_scores, gt_mask, pos_weight=loss_weight)
         return loss
     
-    def evaluate_predictor(self, 
-                          dataloader: DataLoader,
-                          max_batches: int = 50) -> Dict[str, float]:
+    def evaluate_predictor(self, dataloader: DataLoader) -> Dict[str, float]:
         """Evaluate predictor performance."""
         self.predictor.eval()
         
@@ -257,10 +255,7 @@ class LayerwisePredictorTrainer:
         total_gt_sparsity = 0.0
         total_pred_sparsity = 0.0
         with torch.no_grad():
-            for batch_idx, batch in enumerate(dataloader):
-                if batch_idx >= max_batches:
-                    break
-                
+            for batch in dataloader:
                 hidden_states = batch["hidden_states"].to(self.device)
                 mlp_activations = batch["mlp_activations"].to(self.device)
                 
