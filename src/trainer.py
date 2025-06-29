@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset as TorchDataset
-from transformers.optimization import get_cosine_schedule_with_warmup
+from transformers.optimization import get_linear_schedule_with_warmup
 
 
 import wandb
@@ -77,58 +77,14 @@ def load_array_from_chunk(arrays_dir: str, batch_filename: str, batch_index: int
     # Check cache first
     cached_data = _chunk_cache.get(file_path)
     if cached_data is not None:
-        return cached_data[array_name][batch_index]
+        return cached_data[array_name][batch_index - 1]
     
     # Load from disk and cache
     with np.load(file_path, allow_pickle=False) as data:
         # Convert to dict for caching (since npz files can't be cached directly)
         cached_data = {key: data[key] for key in data.files}
         _chunk_cache.put(file_path, cached_data)
-        return cached_data[array_name][batch_index]
-
-
-def get_sample_by_index(output_dir: str, index: int) -> Optional[Dict]:
-    """Load a specific sample by index without loading the full dataset."""
-    try:
-        csv_file = os.path.join(output_dir, "dataset.csv")
-        if not os.path.exists(csv_file):
-            return None
-        
-        arrays_dir = os.path.join(output_dir, "arrays")
-        
-        # Find the row at the specified index
-        with open(csv_file, 'r', newline='') as f:
-            reader = csv.DictReader(f)
-            for current_idx, row in enumerate(reader):
-                if current_idx == index:
-                    batch_filename = row['batch_file']
-                    batch_index = int(row['batch_index'])
-                    
-                    # Load the arrays for this sample
-                    sample = {
-                        'text': row['text'],
-                        'input_ids': load_array_from_chunk(arrays_dir, batch_filename, batch_index, 'input_ids'),
-                        'attention_mask': load_array_from_chunk(arrays_dir, batch_filename, batch_index, 'attention_mask'),
-                    }
-                    
-                    # Load layer arrays
-                    for col in row.keys():
-                        if col.startswith('layer_') and col.endswith('_available') and row[col].lower() == 'true':
-                            layer_idx = int(col.split('_')[1])
-                            sample[f'hidden_states_layer_{layer_idx}'] = load_array_from_chunk(
-                                arrays_dir, batch_filename, batch_index, f'hidden_states_layer_{layer_idx}'
-                            )
-                            sample[f'mlp_activations_layer_{layer_idx}'] = load_array_from_chunk(
-                                arrays_dir, batch_filename, batch_index, f'mlp_activations_layer_{layer_idx}'
-                            )
-                    
-                    return sample
-        
-        return None  # Index out of range
-        
-    except Exception as e:
-        logger.error(f"Error loading sample {index}: {e}")
-        return None
+        return cached_data[array_name][batch_index - 1]
 
 
 class StreamingSparsityDataset(TorchDataset):
@@ -165,13 +121,10 @@ class StreamingSparsityDataset(TorchDataset):
             reader = csv.DictReader(f)
             for row in reader:
                 # Only include samples that have data for our layer
-                layer_key = f"layer_{layer_idx}_available"
-                if layer_key in row and row[layer_key].lower() == 'true':
-                    self.samples.append({
-                        'text': row['text'],
-                        'batch_file': row['batch_file'],
-                        'batch_index': int(row['batch_index'])
-                    })
+                self.samples.append({
+                    'batch_file': row['batch_file'],
+                    'batch_index': int(row['batch_index'])
+                })
         
         logger.info(f"Streaming dataset loaded with {len(self.samples)} samples for layer {layer_idx}")
         
@@ -190,7 +143,6 @@ class StreamingSparsityDataset(TorchDataset):
         for i, sample_info in enumerate(tqdm(self.samples, desc="Loading samples")):
             batch_filename = sample_info['batch_file']
             batch_index = sample_info['batch_index']
-            
             # Load arrays
             hidden_states = load_array_from_chunk(
                 self.arrays_dir, batch_filename, batch_index, f'hidden_states_layer_{self.layer_idx}'
@@ -201,7 +153,6 @@ class StreamingSparsityDataset(TorchDataset):
             
             # Store as tensors for faster access
             self.full_data.append({
-                'text': sample_info['text'],
                 'hidden_states': torch.from_numpy(hidden_states).float(),
                 'mlp_activations': torch.from_numpy(mlp_activations).float()
             })
@@ -232,7 +183,6 @@ class StreamingSparsityDataset(TorchDataset):
         )
         
         return {
-            'text': sample_info['text'],
             'hidden_states': torch.from_numpy(hidden_states).float(),
             'mlp_activations': torch.from_numpy(mlp_activations).float()
         }
@@ -325,15 +275,15 @@ class LayerwisePredictorTrainer:
                 fn = ((~pred_mask) * gt_mask).sum().item()
                 total_gt_sparsity += (gt_mask.sum() / gt_mask.numel())
                 total_pred_sparsity += (pred_mask.sum() / pred_mask.numel())
-                precision = tp / (tp + fp + 1e-8)
-                recall = tp / (tp + fn + 1e-8)
-                f1 = 2 * precision * recall / (precision + recall + 1e-8)
+                precision = tp / (tp + fp)
+                recall = tp / (tp + fn)
+                f1 = 2 * precision * recall / (precision + recall)
                 
                 total_precision += precision
                 total_recall += recall
                 total_f1 += f1
                 total_accuracy += (pred_mask == gt_mask).sum().item()/ pred_mask.numel()
-                num_batches += hidden_states.shape[0]
+                num_batches += 1
         
         self.predictor.train()
         
@@ -386,11 +336,10 @@ class LayerwisePredictorTrainer:
         
         # Setup scheduler
         total_steps = len(train_loader) * num_epochs
-        scheduler = get_cosine_schedule_with_warmup(
+        scheduler = get_linear_schedule_with_warmup(
             optimizer,
             num_warmup_steps=int(0.1 * total_steps),
             num_training_steps=total_steps,
-            num_cycles=1.5
         )
         
         best_f1 = 0.0
@@ -475,6 +424,8 @@ class LayerwisePredictorTrainer:
             
             if use_wandb:
                 wandb.log({
+                    f"layer_{self.layer_idx}/eval_gt_sparsity": eval_metrics["gt_sparsity"],
+                    f"layer_{self.layer_idx}/eval_pred_sparsity": eval_metrics["pred_sparsity"],
                     f"layer_{self.layer_idx}/eval_accuracy": eval_metrics["accuracy"],
                     f"layer_{self.layer_idx}/eval_precision": eval_metrics["precision"],
                     f"layer_{self.layer_idx}/eval_recall": eval_metrics["recall"],
