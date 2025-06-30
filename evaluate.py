@@ -6,8 +6,11 @@ import torch
 
 from transformers.trainer_utils import set_seed
 from transformers import AutoConfig, AutoModelForCausalLM
-from lm_eval_harness.models import HFLM
-from lm_eval_harness import simple_evaluate
+from lm_eval.models import HFLM
+from lm_eval import simple_evaluate
+from lm_eval.utils import make_table
+
+from src.evaluation import SparseLM
 
 
 # Setup logging
@@ -60,7 +63,7 @@ def main():
             pretrained_dict = torch.load(layer_path)
             layer.mlp_lora_proj.load_state_dict(pretrained_dict)
 
-    wrapped_model = HFLM(
+    wrapped_model = SparseLM(
         pretrained=model,
         batch_size=args.batch_size,
         device=device
@@ -74,11 +77,10 @@ def main():
         device=device
     )
 
-
-
-
-
-
+    if results is not None:
+        print(make_table(results))
+        if "groups" in results:
+            print(make_table(results, "groups"))
 
 if __name__ == '__main__':
     main()
