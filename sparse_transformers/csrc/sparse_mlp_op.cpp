@@ -35,7 +35,8 @@ torch::Tensor sparse_mlp_forward_cpu(
     const torch::Tensor &active_down_weight,
     torch::Tensor &down_proj_buffer,
     torch::Tensor &combined_proj_buffer,
-    const std::string &activation_fn);
+    const std::string &activation_fn,
+    bool has_gate);
 
 #ifdef WITH_CUDA
 torch::Tensor sparse_mlp_forward_cuda(
@@ -44,7 +45,8 @@ torch::Tensor sparse_mlp_forward_cuda(
     const torch::Tensor &active_down_weight,
     torch::Tensor &down_proj_buffer,
     torch::Tensor &combined_proj_buffer,
-    const std::string &activation_fn);
+    const std::string &activation_fn,
+    bool has_gate);
 #endif
 
 // Main dispatch function
@@ -54,21 +56,22 @@ torch::Tensor sparse_mlp_forward(
     const torch::Tensor &active_down_weight,
     torch::Tensor &down_proj_buffer,
     torch::Tensor &combined_proj_buffer,
-    const std::string &activation_fn)
+    const std::string &activation_fn,
+    bool has_gate=true)
 {
 
     // Check if input is on CUDA and dispatch accordingly
     if (input.is_cuda())
     {
 #ifdef WITH_CUDA
-        return sparse_mlp_forward_cuda(input, concat_weight, active_down_weight, down_proj_buffer, combined_proj_buffer, activation_fn);
+        return sparse_mlp_forward_cuda(input, concat_weight, active_down_weight, down_proj_buffer, combined_proj_buffer, activation_fn, has_gate);
 #else
         AT_ERROR("CUDA not available - cannot run on GPU");
 #endif
     }
     else
     {
-        return sparse_mlp_forward_cpu(input, concat_weight, active_down_weight, down_proj_buffer, combined_proj_buffer, activation_fn);
+        return sparse_mlp_forward_cpu(input, concat_weight, active_down_weight, down_proj_buffer, combined_proj_buffer, activation_fn, has_gate);
     }
 }
 
@@ -79,7 +82,8 @@ torch::Tensor sparse_mlp_forward_cpu(
     const torch::Tensor &active_down_weight,
     torch::Tensor &down_proj_buffer,
     torch::Tensor &combined_proj_buffer,
-    const std::string &activation_fn)
+    const std::string &activation_fn,
+    bool has_gate)
 {
     // Store original input shape for reshaping output later
     auto original_shape = input.sizes().vec();
@@ -126,33 +130,62 @@ torch::Tensor sparse_mlp_forward_cpu(
         grain_size = std::min(grain_size, max_grain_matmul);
     }
 
-    // Process each batch block in parallel
-    at::parallel_for(0, batch_size, grain_size, [&](int64_t start, int64_t end)
-                     {
-        // Process blocks of batches instead of single items
-        const int64_t block_size = end - start;
-        const int64_t gate_size = concat_weight.size(0) / 2;
-        
-        // Get input block for this thread
-        auto input_block = input_2d.slice(0, start, end);  // [block_size, hidden_size]
-        
-        // Get output buffer views for this block
-        auto combined_proj_block = combined_proj_buffer.slice(0, start, end);  // [block_size, 2*gate_size]
-        auto down_proj_block = down_proj_buffer.slice(0, start, end);  // [block_size, hidden_size]
-        
-        // Perform batch matrix multiplication for gate and up projections
-        // This is more efficient than individual matmuls
-        torch::matmul_out(combined_proj_block, input_block, concat_weight.t());
-        
-        // Split into gate and up projections
-        auto gate_proj = combined_proj_block.narrow(1, 0, gate_size);  // [block_size, gate_size]
-        auto up_proj = combined_proj_block.narrow(1, gate_size, gate_size);  // [block_size, gate_size]
+    if (has_gate)
+    {
+        // Process each batch block in parallel
+        at::parallel_for(0, batch_size, grain_size, [&](int64_t start, int64_t end)
+                        {
+            // Process blocks of batches instead of single items
+            const int64_t block_size = end - start; 
+            const int64_t gate_size = concat_weight.size(0) / 2;
+            
+            // Get input block for this thread
+            auto input_block = input_2d.slice(0, start, end);  // [block_size, hidden_size]
+            
+            // Get output buffer views for this block
+            auto combined_proj_block = combined_proj_buffer.slice(0, start, end);  // [block_size, 2*gate_size]
+            auto down_proj_block = down_proj_buffer.slice(0, start, end);  // [block_size, hidden_size]
+            
+            // Perform batch matrix multiplication for gate and up projections
+            // This is more efficient than individual matmuls
+            torch::matmul_out(combined_proj_block, input_block, concat_weight.t());
+            
+            // Split into gate and up projections
+            auto gate_proj = combined_proj_block.narrow(1, 0, gate_size);  // [block_size, gate_size]
+            auto up_proj = combined_proj_block.narrow(1, gate_size, gate_size);  // [block_size, gate_size]
 
-        gate_proj.sigmoid_();  // In-place sigmoid
-        gate_proj.mul_(up_proj);  // In-place element-wise multiplication
-        
-        // Final projection to output dimension
-        torch::matmul_out(down_proj_block, gate_proj, active_down_weight.t()); });
+            gate_proj.sigmoid_();  // In-place sigmoid
+            gate_proj.mul_(up_proj);  // In-place element-wise multiplication
+            
+            // Final projection to output dimension
+            torch::matmul_out(down_proj_block, gate_proj, active_down_weight.t()); 
+        });
+    }
+    else
+    {
+        // Process each batch block in parallel
+        at::parallel_for(0, batch_size, grain_size, [&](int64_t start, int64_t end)
+                        {
+            // Process blocks of batches instead of single items
+            const int64_t block_size = end - start; 
+
+            // Get input block for this thread
+            auto input_block = input_2d.slice(0, start, end);  // [block_size, hidden_size]
+            
+            // Get output buffer views for this block
+            auto combined_proj_block = combined_proj_buffer.slice(0, start, end);  // [block_size, 2*gate_size]
+            auto down_proj_block = down_proj_buffer.slice(0, start, end);  // [block_size, hidden_size]
+            
+            // Perform batch matrix multiplication for gate and up projections
+            // This is more efficient than individual matmuls
+            torch::matmul_out(combined_proj_block, input_block, concat_weight.t());
+
+            combined_proj_block.sigmoid_();  // In-place sigmoid
+            
+            // Final projection to output dimension
+            torch::matmul_out(down_proj_block, combined_proj_block, active_down_weight.t()); 
+        });
+    }
 
     // Reshape output back to original shape if input was multi-dimensional
     return needs_reshape ? down_proj_buffer.view(original_shape) : down_proj_buffer;
@@ -163,7 +196,7 @@ TORCH_LIBRARY(sparse_mlp, m)
 {
     // Register the optimized weight cache
     m.class_<WeightCache>("WeightCache")
-        .def(torch::init<const torch::Tensor &, int64_t, const torch::Tensor &, const torch::Tensor &, const torch::Tensor &>())
+        .def(torch::init<const torch::Tensor &, int64_t, const torch::Tensor &, const torch::Tensor &, const torch::Tensor &>(), bool)
         .def("update_active_weights", &WeightCache::update_active_weights)
         .def("get_concat_weight", &WeightCache::get_concat_weight)
         .def("get_active_down_weight", &WeightCache::get_active_down_weight);

@@ -25,10 +25,14 @@ torch.classes.load_library(os.path.join(os.path.dirname(__file__), "sparse_trans
 
 # Only define these if the extension loaded successfully
 sparse_mlp_forward = torch.ops.sparse_mlp.forward
+sparse_mlp_forward_opt = torch.ops.sparse_mlp.forward_opt
 WeightCache = torch.classes.sparse_mlp.WeightCache
+WeightCacheOpt = torch.classes.sparse_mlp.WeightCacheOpt
 approx_topk_threshold = torch.ops.sparse_mlp.approx_topk_threshold
 __all__ = [
     'sparse_mlp_forward',
+    'sparse_mlp_forward_opt',
     'WeightCache',
+    'WeightCacheOpt',
     'approx_topk_threshold'
 ]

@@ -169,17 +169,6 @@ class Phi3SkipConnectionModel(Phi3SkipConnectionModelBase):
         self.norm = Phi3RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = Phi3RotaryEmbedding(config=config)
 
-    def _initialize_unloaded_weights(self):
-        for module in self.modules():
-            if any(hasattr(p, 'is_meta') and p.is_meta for p in module.parameters()):
-                if isinstance(module, FastLoRAProjection):
-                    module = module.to_empty(device="cpu")
-                    with torch.no_grad():
-                        torch.nn.init.xavier_normal_(module.down.weight)
-                        torch.nn.init.zeros_(module.up.weight)  # Initialize up projection to zeros for stable training
-                elif isinstance(module, Phi3SkipMLP):
-                    module._fix_weights()
-
     def _update_causal_mask(
         self,
         attention_mask: Union[torch.Tensor, "BlockMask"],

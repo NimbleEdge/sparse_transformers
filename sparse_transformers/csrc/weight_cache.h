@@ -23,6 +23,7 @@ private:
     };
 
     bool is_initialized = false;
+    bool has_gate_buffers;
 
     // Memory pools for all weight data (cache-aligned)
     std::unique_ptr<float[], AlignedDeleter> gate_memory_pool;
@@ -117,9 +118,10 @@ private:
             throw std::runtime_error("No active weights");
 
         // Create gate tensor directly from buffer
-        auto gate_tensor = torch::from_blob(active_gate_buffer.get(),
-                                            {static_cast<int64_t>(num_active), gate_row_size},
-                                            torch::TensorOptions().dtype(dtype));
+        if (has_gate_buffers)
+            auto gate_tensor = torch::from_blob(active_gate_buffer.get(),
+                                                {static_cast<int64_t>(num_active), gate_row_size},
+                                                torch::TensorOptions().dtype(dtype));
 
         // Create up tensor directly from buffer
         auto up_tensor = torch::from_blob(active_up_buffer.get(),
@@ -133,50 +135,64 @@ private:
         auto down_tensor = down_tensor_packed.t(); // [hidden_dim, num_active]
 
         // Concatenate and move to target device
-        active_weights_cache = torch::cat({gate_tensor, up_tensor}, 0).to(current_device);
+        if (has_gate_buffers)
+        {
+            active_weights_cache = torch::cat({gate_tensor, up_tensor}, 0).to(current_device);
+        }
+        else
+        {
+            active_weights_cache = up_tensor.to(current_device);
+        }
         active_downs_cache = down_tensor.to(current_device);
     }
 
 public:
     WeightCache(const torch::Tensor &init_mask, int64_t hidden_size,
                 const torch::Tensor &gate_weight, const torch::Tensor &up_weight,
-                const torch::Tensor &down_weight)
+                const torch::Tensor &down_weight, bool has_gate=true)
     {
-        init(init_mask, hidden_size, gate_weight, up_weight, down_weight);
+        init(init_mask, hidden_size, gate_weight, up_weight, down_weight, has_gate);
     }
 
     void init(const torch::Tensor &init_mask, int64_t hidden_size,
               const torch::Tensor &gate_weight, const torch::Tensor &up_weight,
-              const torch::Tensor &down_weight)
+              const torch::Tensor &down_weight, bool has_gate)
     {
 
-        current_device = gate_weight.device();
-        dtype = gate_weight.scalar_type();
+        current_device = up_weight.device();
+        dtype = up_weight.scalar_type();
+        has_gate_buffers = has_gate;
 
         // Store dimensions
         hidden_dim = hidden_size;
-        sparse_dim = gate_weight.size(0);
+        sparse_dim = up_weight.size(0);
         max_active_indices = init_mask.sum().item<int64_t>();
         min_active_indices = max_active_indices / 2;
-        gate_row_size = gate_weight.size(1);
         up_row_size = up_weight.size(1);
         down_row_size = hidden_dim; // After transpose: [intermediate_size, hidden_size]
 
         // Allocate cache-aligned memory pools
-        const size_t gate_total_size = sparse_dim * gate_row_size;
         const size_t up_total_size = sparse_dim * up_row_size;
         const size_t down_total_size = sparse_dim * hidden_dim; // Transposed shape
 
-        gate_memory_pool = std::unique_ptr<float[], AlignedDeleter>(
-            static_cast<float *>(aligned_alloc_wrapper(gate_total_size * sizeof(float))));
+        if (has_gate_buffers)
+        {
+            gate_row_size = gate_weight.size(1); 
+            const size_t gate_total_size = sparse_dim * gate_row_size;
+
+            gate_memory_pool = std::unique_ptr<float[], AlignedDeleter>(
+                static_cast<float *>(aligned_alloc_wrapper(gate_total_size * sizeof(float))));
+        }
+
         up_memory_pool = std::unique_ptr<float[], AlignedDeleter>(
             static_cast<float *>(aligned_alloc_wrapper(up_total_size * sizeof(float))));
         down_memory_pool_transposed = std::unique_ptr<float[], AlignedDeleter>(
             static_cast<float *>(aligned_alloc_wrapper(down_total_size * sizeof(float))));
 
         // Pre-allocate contiguous buffers for active weights
-        active_gate_buffer = std::unique_ptr<float[], AlignedDeleter>(
-            static_cast<float *>(aligned_alloc_wrapper(max_active_indices * gate_row_size * sizeof(float))));
+        if (has_gate_buffers)
+            active_gate_buffer = std::unique_ptr<float[], AlignedDeleter>(
+                static_cast<float *>(aligned_alloc_wrapper(max_active_indices * gate_row_size * sizeof(float))));
         active_up_buffer = std::unique_ptr<float[], AlignedDeleter>(
             static_cast<float *>(aligned_alloc_wrapper(max_active_indices * up_row_size * sizeof(float))));
         active_down_buffer = std::unique_ptr<float[], AlignedDeleter>(
@@ -186,12 +202,14 @@ public:
         index_to_position.reserve(max_active_indices);
 
         // Copy weights to memory pools
-        auto gate_cpu = gate_weight.to(torch::kCPU).contiguous();
+        if (has_gate_buffers)
+            auto gate_cpu = gate_weight.to(torch::kCPU).contiguous();
         auto up_cpu = up_weight.to(torch::kCPU).contiguous();
         auto down_cpu = down_weight.to(torch::kCPU).contiguous();
 
         // Copy gate and up weights directly (row-major format)
-        std::memcpy(gate_memory_pool.get(), gate_cpu.data_ptr<float>(), gate_total_size * sizeof(float));
+        if (has_gate_buffers)
+            std::memcpy(gate_memory_pool.get(), gate_cpu.data_ptr<float>(), gate_total_size * sizeof(float));
         std::memcpy(up_memory_pool.get(), up_cpu.data_ptr<float>(), up_total_size * sizeof(float));
 
         // Transpose down matrix during copy: [hidden_size, intermediate_size] -> [intermediate_size, hidden_size]
@@ -241,9 +259,10 @@ public:
                 size_t pos = it->second;
 
                 // Direct replacement - copy new data over old position (single memcpy per matrix!)
-                std::memcpy(active_gate_buffer.get() + pos * gate_row_size,
-                            gate_memory_pool.get() + added_idx * gate_row_size,
-                            gate_row_size * sizeof(float));
+                if (has_gate_buffers)
+                    std::memcpy(active_gate_buffer.get() + pos * gate_row_size,
+                                gate_memory_pool.get() + added_idx * gate_row_size,
+                                gate_row_size * sizeof(float));
 
                 std::memcpy(active_up_buffer.get() + pos * up_row_size,
                             up_memory_pool.get() + added_idx * up_row_size,
@@ -272,9 +291,10 @@ public:
             }
 
             // Append to end
-            std::memcpy(active_gate_buffer.get() + new_pos * gate_row_size,
-                        gate_memory_pool.get() + added_idx * gate_row_size,
-                        gate_row_size * sizeof(float));
+            if (has_gate_buffers)
+                std::memcpy(active_gate_buffer.get() + new_pos * gate_row_size,
+                            gate_memory_pool.get() + added_idx * gate_row_size,
+                            gate_row_size * sizeof(float));
 
             std::memcpy(active_up_buffer.get() + new_pos * up_row_size,
                         up_memory_pool.get() + added_idx * up_row_size,
@@ -311,9 +331,10 @@ public:
                     // Move last element to fill gap
                     int64_t last_idx = active_indices[last_pos];
 
-                    std::memcpy(active_gate_buffer.get() + pos_to_remove * gate_row_size,
-                                active_gate_buffer.get() + last_pos * gate_row_size,
-                                gate_row_size * sizeof(float));
+                    if (has_gate_buffers)
+                        std::memcpy(active_gate_buffer.get() + pos_to_remove * gate_row_size,
+                                    active_gate_buffer.get() + last_pos * gate_row_size,
+                                    gate_row_size * sizeof(float));
 
                     std::memcpy(active_up_buffer.get() + pos_to_remove * up_row_size,
                                 active_up_buffer.get() + last_pos * up_row_size,
