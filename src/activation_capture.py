@@ -55,12 +55,29 @@ class ActivationCapture(ABC):
                 handle = self._register_gate_hook(i, layer)
                 if handle is not None:
                     self.handles.append(handle)
-            
+                        
             # Also capture up_proj activations
             if self.has_up_proj:
                 handle = self._register_up_hook(i, layer)
                 if handle is not None:
                     self.handles.append(handle)
+    
+    def _create_hidden_state_hook(self, layer_idx):
+        def hook(module, args, kwargs, output):
+            # args[0] is the input hidden states to the layer
+            if len(args) > 0:
+                # Just detach, don't clone or move to CPU yet
+                self.hidden_states[layer_idx] = args[0].clone().detach()
+            return output
+        return hook
+    
+    def _create_mlp_hook(self, layer_idx, proj_type):
+        def hook(module, input, output):
+            key = f"{layer_idx}_{proj_type}"
+            # Just detach, don't clone or move to CPU yet
+            self.mlp_activations[key] = output.clone().detach()
+            return output
+        return hook
 
     def remove_hooks(self):
         """Remove all registered hooks."""
@@ -115,15 +132,10 @@ class ActivationCaptureDefault(ActivationCapture):
     def get_mlp_activations(self, layer_idx):
         """Get combined MLP activations for a layer."""
         gate_key = f"{layer_idx}_gate"
-        up_key = f"{layer_idx}_up"
         
-        if gate_key in self.mlp_activations and up_key in self.mlp_activations:
-            # Compute gated activations: gate(x) * up(x)
+        if gate_key in self.mlp_activations:
             gate_act = self.mlp_activations[gate_key]
-            up_act = self.mlp_activations[up_key]
-            
-            # Apply SwiGLU activation: silu(gate) * up
-            gated_act = F.silu(gate_act) * up_act
+            gated_act = F.silu(gate_act)
             return gated_act
         
         return None

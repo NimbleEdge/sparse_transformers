@@ -71,7 +71,7 @@ def main():
     parser.add_argument("--num_epochs", type=int, default=10, help="Number of training epochs")
     parser.add_argument("--learning_rate", type=float, default=1e-5, help="Learning rate")
     parser.add_argument("--lora_size", type=int, default=None, help="LoRA bottleneck size (default: 4% of intermediate_size)")
-    parser.add_argument("--val_split", type=float, default=0.2, help="Validation split fraction")
+    parser.add_argument("--val_split", type=float, default=0.1, help="Validation split fraction")
     parser.add_argument("--cache_size", type=int, default=50, help="Number of .npz chunk files to cache in memory")
     parser.add_argument("--load_full_dataset", action="store_true", help="Load full dataset into memory at initialization (faster but uses more memory)")
     parser.add_argument("--checkpoint_save_interval", type=int, default=1000, help="Save checkpoint every N steps")
@@ -145,19 +145,6 @@ def main():
     
     logger.info(f"Using {len(train_dataset)} training samples, {len(val_dataset)} validation samples")
     logger.info(f"Checkpoints will be saved every {args.checkpoint_save_interval} steps to {args.output_dir}")
-    
-    # Handle specific checkpoint path for resuming
-    if args.checkpoint_path and args.resume_from_checkpoint:
-        logger.info(f"Will attempt to resume from specific checkpoint: {args.checkpoint_path}")
-        # Temporarily override the trainer to load from specific checkpoint
-        if os.path.exists(args.checkpoint_path):
-            # This will be handled in the trainer's resume logic
-            pass
-        else:
-            logger.error(f"Specified checkpoint path does not exist: {args.checkpoint_path}")
-            return
-    elif args.resume_from_checkpoint:
-        logger.info("Will attempt to resume from latest checkpoint")
     
     # Train predictor
     trainer.train_layer(
