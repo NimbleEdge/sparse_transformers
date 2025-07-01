@@ -141,7 +141,6 @@ sparse_mlp_forward(
 
 ## Installation
 
-
 ### Build C++ Extensions
 ```bash
 # Clone repository
@@ -160,10 +159,17 @@ Install torch dependencies from [requirements.txt](requirements.txt#L2)
 ```bash
 # Install in editable mode (builds C++ extensions automatically)
 pip install -r requirements.txt
-python setup.py build_ext --inplace
+pip install -e .                 # Auto-detect (prefer GPU if available)
+pip install -e . --build-option=cpu     # Force CPU-only build
+pip install -e . --build-option=gpu     # Force GPU build (fallback to CPU if not available)
+
+# Alternative: Direct setup.py commands
+python setup.py develop         # Auto-detect (prefer GPU if available)
+python setup.py develop cpu     # Force CPU-only build
+python setup.py develop gpu     # Force GPU build (fallback to CPU if not available)
 
 # Verify installation
-python -c "import sparse_transformers; print('✅ Installation successful!')"
+python -c "import sparse_transformers; print('✅ Installation successful')"
 ```
 
 ## Community engagement
