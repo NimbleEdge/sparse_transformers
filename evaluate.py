@@ -9,8 +9,7 @@ from transformers import AutoConfig, AutoModelForCausalLM
 from lm_eval.models import HFLM
 from lm_eval import simple_evaluate
 from lm_eval.utils import make_table
-
-from src.evaluation import SparseLM
+from lm_eval.models.huggingface import HFLM
 
 
 # Setup logging
@@ -31,7 +30,6 @@ def parse_args():
     parser.add_argument("--device", type=str, default="auto",
                        help="Device to use (auto, cpu, cuda)")
     return parser
-
 
 
 def main():
@@ -62,8 +60,10 @@ def main():
                 return
             pretrained_dict = torch.load(layer_path)
             layer.mlp_lora_proj.load_state_dict(pretrained_dict)
+        model.tie_weights()
+        model.reset_cache()
 
-    wrapped_model = SparseLM(
+    wrapped_model = HFLM(
         pretrained=model,
         batch_size=args.batch_size,
         device=device
