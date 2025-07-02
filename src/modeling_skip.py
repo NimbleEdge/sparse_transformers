@@ -107,16 +107,19 @@ class SkipMLP(nn.Module):
 class SkipDecoderLayer(ABC, GradientCheckpointingLayer):
     def __init__(self, config: PretrainedConfig, layer_idx: int):
         super().__init__()
+        self.config = config
         self.hidden_size = config.hidden_size
         self.layer_idx = layer_idx
         self.sparsity = config.sparsity
 
         self._init_components(config, layer_idx)
 
-        self.lora_size = int(config.intermediate_size * 0.04)
+        intermediate_size = config.intermediate_size[layer_idx] if isinstance(config.intermediate_size, list) \
+            else config.intermediate_size
+        self.lora_size = int(intermediate_size * 0.04)
         self.mlp_lora_proj = FastLoRAProjection(
             config.hidden_size, 
-            config.intermediate_size,
+            intermediate_size,
             self.lora_size
         )
         
@@ -339,17 +342,7 @@ def build_skip_connection_model(pretrained_model_class: type[PreTrainedModel]) -
                 hidden_states=all_hidden_states,  # type: ignore
                 attentions=all_self_attns,
             )
-        
-        @abstractmethod
-        def _update_causal_mask(
-            self,
-            attention_mask: Union[torch.Tensor, "BlockMask"], # type: ignore    
-            input_tensor: torch.Tensor,
-            cache_position: torch.Tensor,
-            past_key_values: Cache,
-            output_attentions: bool = False,
-        ):
-            pass
+
     return SkipConnectionModel
 
 

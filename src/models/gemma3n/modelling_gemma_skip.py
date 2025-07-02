@@ -11,6 +11,7 @@ from transformers.modeling_utils import PreTrainedModel
 from transformers.processing_utils import Unpack
 from transformers.masking_utils import create_causal_mask, create_sliding_window_causal_mask
 from transformers.modeling_flash_attention_utils import FlashAttentionKwargs
+from transformers.activations import ACT2FN
 
 from transformers.modeling_outputs import (
     BaseModelOutputWithPast,
@@ -18,7 +19,7 @@ from transformers.modeling_outputs import (
 )
 
 
-from transformers.models.qwen2.modeling_qwen2 import(
+from transformers.models.gemma3n.modeling_gemma3n import(
     Gemma3nTextMLP, Gemma3nTextAttention, Gemma3nRMSNorm, Gemma3nTextAltUp, Gemma3nTextLaurelBlock,
     Gemma3nTextRotaryEmbedding, Gemma3nTextScaledWordEmbedding
 )
@@ -30,19 +31,7 @@ from src.modeling_skip import SkipMLP, SkipDecoderLayer, build_skip_connection_m
 
 logger = logging.get_logger(__name__)
 
-
-class Gemma3nSkipMLP(SkipMLP):
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = sparse_mlp_forward(
-            x.detach(), 
-            self.weight_cache.get_concat_weight(),  # type: ignore
-            self.weight_cache.get_active_down_weight(),  # type: ignore
-            self.down_proj_buffer,
-            self.combined_proj_buffer,
-            "gelu"
-        )
-        return out
-
+# NOTE: Gemma has its own sparsity for activations that may conflict with ours. Right now we just use ours, but this may need to be revisited.
 
 class Gemma3nSkipDecoderLayer(SkipDecoderLayer):
     def _init_components(self, config, layer_idx):
@@ -52,6 +41,8 @@ class Gemma3nSkipDecoderLayer(SkipDecoderLayer):
         self.pre_feedforward_layernorm = Gemma3nRMSNorm(self.hidden_size, eps=config.rms_norm_eps)
         self.post_feedforward_layernorm = Gemma3nRMSNorm(self.hidden_size, eps=config.rms_norm_eps)
         self.hidden_size_per_layer_input = config.hidden_size_per_layer_input
+        self.attention_type = config.layer_types[layer_idx]
+        self.act_fn = ACT2FN[config.hidden_activation]
 
         self.altup = Gemma3nTextAltUp(config)
         self.laurel = Gemma3nTextLaurelBlock(config)
@@ -67,7 +58,8 @@ class Gemma3nSkipDecoderLayer(SkipDecoderLayer):
             config.hidden_size,
             config.intermediate_size[layer_idx],
             config.sparsity,
-            config.mlp_bias,
+            False,
+            "gelu_pytorch_tanh"
         )
 
     def forward(
@@ -426,6 +418,12 @@ class Gemma3nSkipConnectionForCausalLM(Gemma3nSkipConnectionForCausalLMBase):
     config_class = Gemma3nSkipConnectionConfig
     base_model_prefix = "model"
     _checkpoint_conversion_mapping = {"model.language_model": "model"}
+    _keys_to_ignore_on_load_unexpected = [
+        "model.embed_audio.*",
+        "model.embed_vision.*",
+        "model.audio_tower.*",
+        "model.vision_tower.*"
+    ]
 
     def forward(
         self,
