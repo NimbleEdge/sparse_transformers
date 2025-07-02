@@ -1,6 +1,6 @@
 # Core ML/AI packages
 # conda install pytorch==2.5.0 torchvision==0.20.0 torchaudio==2.5.0 pytorch-cuda=12.4 -c pytorch -c nvidia
-transformers==4.52.4
+transformers==4.53.0
 numpy
 psutil
 optimum
@@ -11,3 +11,5 @@ datasets
 sentencepiece
 protobuf
 wandb
+timm
+pillow
