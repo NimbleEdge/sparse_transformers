@@ -48,7 +48,7 @@ class FastLoRAProjection(nn.Module):
         return torch.mm(torch.mm(x, self.down.weight.t()), self.up.weight.t())
                      
 class SkipMLP(nn.Module):
-    def __init__(self, hidden_size: int, intermediate_size: int, sparsity: float, bias: bool = False):
+    def __init__(self, hidden_size: int, intermediate_size: int, sparsity: float, bias: bool = False, act_fn="silu"):
         super().__init__()
         self.gate_proj = nn.Linear(hidden_size, intermediate_size, bias=bias)
         self.up_proj = nn.Linear(hidden_size, intermediate_size, bias=bias)
@@ -56,6 +56,7 @@ class SkipMLP(nn.Module):
         self.sparsity = sparsity
         self.hidden_size = hidden_size
         self.intermediate_size = intermediate_size
+        self.act_fn = act_fn
         
         # Initialize mask but defer WeightCache creation until post_init
         self.init_mask = torch.ones(intermediate_size, dtype=torch.bool)
@@ -67,12 +68,12 @@ class SkipMLP(nn.Module):
         self.register_buffer('down_proj_buffer', torch.zeros(1, hidden_size, requires_grad=False))
         self.register_buffer('combined_proj_buffer', torch.zeros(1, 2 * int(intermediate_size * sparsity), requires_grad=False))
 
-    def initialize_weight_cache(self):
+    def initialize_weight_cache(self, init_mask=None):
         """Tie weights after weights are loaded (called from post_init)."""
         if self.weight_cache is None:
             # Create and initialize weight cache
             self.weight_cache = WeightCache(   
-                self.init_mask,
+                init_mask if init_mask is not None else self.init_mask,
                 self.hidden_size,
                 self.gate_proj.weight,
                 self.up_proj.weight, 
@@ -97,25 +98,29 @@ class SkipMLP(nn.Module):
             self.weight_cache.get_active_down_weight(),  # type: ignore
             self.down_proj_buffer,
             self.combined_proj_buffer,
-            "silu"
+            self.act_fn
         )
         return out
 
 
 
 class SkipDecoderLayer(ABC, GradientCheckpointingLayer):
-    def __init__(self, config: PretrainedConfig, layer_idx: int):
+    def __init__(self, config: PretrainedConfig, layer_idx: int, use_skip:bool = True):
         super().__init__()
+        self.config = config
         self.hidden_size = config.hidden_size
         self.layer_idx = layer_idx
         self.sparsity = config.sparsity
+        self.use_skip = use_skip
 
         self._init_components(config, layer_idx)
 
-        self.lora_size = int(config.intermediate_size * 0.04)
+        intermediate_size = config.intermediate_size[layer_idx] if isinstance(config.intermediate_size, list) \
+            else config.intermediate_size
+        self.lora_size = int(intermediate_size * 0.04)
         self.mlp_lora_proj = FastLoRAProjection(
             config.hidden_size, 
-            config.intermediate_size,
+            intermediate_size,
             self.lora_size
         )
         
@@ -124,20 +129,20 @@ class SkipDecoderLayer(ABC, GradientCheckpointingLayer):
         # Only initialize predictor training components if explicitly enabled
         if self.is_training_config:
             # Standard MLP for ground truth collection during training
-            self._set_mlp_train(config)
+            self._set_mlp_train(config, layer_idx)
         else:
-            self._set_mlp_inference(config)
+            self._set_mlp_inference(config, layer_idx)
 
     @abstractmethod
     def _init_components(self, config, layer_idx):
         pass
 
     @abstractmethod
-    def _set_mlp_train(self, config):
+    def _set_mlp_train(self, config, layer_idx):
         pass
 
     @abstractmethod
-    def _set_mlp_inference(self, config):
+    def _set_mlp_inference(self, config, layer_idx):
         pass
 
     @property
@@ -145,12 +150,19 @@ class SkipDecoderLayer(ABC, GradientCheckpointingLayer):
         """Dynamically access the weight cache from the MLP."""
         if hasattr(self.mlp, 'weight_cache') and isinstance(self.mlp, SkipMLP):
             return self.mlp.weight_cache
-
+        
+    def _set_skip_active(self, flag):
+        if not self.is_training_config and self.use_skip != flag:
+            init_mask = torch.ones(self.intermediate_size, dtype=torch.bool) if not flag else None
+            self.mlp.weight_cache = None
+            self.mlp.initialize_weight_cache(init_mask=init_mask)
+            self.use_skip = flag
     
     def _compute_binary_mask(self, hidden_states):
-        lora_proj_scores = self.mlp_lora_proj(hidden_states.view(-1, hidden_states.shape[-1]))
-        binary_mask = (lora_proj_scores >= lora_proj_scores.mean() + 2 * lora_proj_scores.std()).bool()
-        self.weight_cache.update_active_weights(binary_mask.any(dim=0))  # type: ignore
+        if self.use_skip:
+            lora_proj_scores = self.mlp_lora_proj(hidden_states.view(-1, hidden_states.shape[-1]))
+            binary_mask = (lora_proj_scores >= lora_proj_scores.mean() + 2 * lora_proj_scores.std()).bool()
+            self.weight_cache.update_active_weights(binary_mask.any(dim=0))  # type: ignore
     
     def forward(
         self,
@@ -195,6 +207,12 @@ class SkipDecoderLayer(ABC, GradientCheckpointingLayer):
         return outputs
     
 
+'''
+Note:
+Now that the intermediate losses have been removed, almost all the actual changes are confined to SkipDecoderLayer and Skip MLP.
+SkipConnectionModel/SkipConnectionForCausalLM may not even be necessary. It's possible at some point in the future we might want 
+to attempt a refactor here to simply extend from e.g. LlamaModel and just override the initialization.
+'''
 def build_skip_connection_model(pretrained_model_class: type[PreTrainedModel]) -> type[PreTrainedModel]:
     class SkipConnectionModel(ABC, pretrained_model_class):
         def __init__(self, config: PretrainedConfig):
@@ -332,17 +350,7 @@ def build_skip_connection_model(pretrained_model_class: type[PreTrainedModel]) -
                 hidden_states=all_hidden_states,  # type: ignore
                 attentions=all_self_attns,
             )
-        
-        @abstractmethod
-        def _update_causal_mask(
-            self,
-            attention_mask: Union[torch.Tensor, "BlockMask"], # type: ignore    
-            input_tensor: torch.Tensor,
-            cache_position: torch.Tensor,
-            past_key_values: Cache,
-            output_attentions: bool = False,
-        ):
-            pass
+
     return SkipConnectionModel
 
 
@@ -401,6 +409,10 @@ def build_skip_connection_model_for_causal_lm(pretrained_model_class: type[PreTr
 
         def get_decoder(self):
             return self.model
+
+        def set_skip_active(self, flag):
+            for layer in self.get_decoder().layers:
+                layer._set_skip_active(flag)
 
         def get_predictor_parameters(self):
             """Get parameters of all predictor networks for optimization."""

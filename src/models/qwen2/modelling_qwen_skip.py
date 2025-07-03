@@ -36,15 +36,16 @@ class Qwen2SkipDecoderLayer(SkipDecoderLayer):
                 "unexpected results may be encountered."
             )
 
-    def _set_mlp_train(self, config):
+    def _set_mlp_train(self, config, layer_idx):
         self.mlp = Qwen2MLP(config)
 
-    def _set_mlp_inference(self, config):
+    def _set_mlp_inference(self, config, layer_idx):
         self.mlp = SkipMLP(
             config.hidden_size,
             config.intermediate_size,
             config.sparsity,
             False,
+            "silu"
         )    
 
 class Qwen2SkipPreTrainedModel(PreTrainedModel):

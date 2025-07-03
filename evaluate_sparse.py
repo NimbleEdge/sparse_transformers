@@ -6,10 +6,11 @@ import torch
 
 from transformers.trainer_utils import set_seed
 from transformers import AutoConfig, AutoModelForCausalLM
-from lm_eval.models import HFLM
 from lm_eval import simple_evaluate
 from lm_eval.utils import make_table
 from lm_eval.models.huggingface import HFLM
+
+import src.models
 
 
 # Setup logging
@@ -19,8 +20,9 @@ logger = logging.getLogger(__name__)
 def parse_args():
     parser = argparse.ArgumentParser(description="Evaluate trained model on common LM datasets using LM Eval Harness.")
     parser.add_argument("--model_type", type=str, choices=["hf", "sparse"], default="hf")
-    parser.add_argument("--model_name_or_config", type=str, required=True,
+    parser.add_argument("--model_name_or_config_path", type=str, required=True,
                        help="Name or path of the base model (e.g., meta-llama/Llama-2-7b-hf)")
+    parser.add_argument("--disable_sparsity", action="store_true")
     parser.add_argument("--sp_dir", type=str, default="",
                         help="Path to trained predictor dir for sparse model.")
     parser.add_argument("--tasks", nargs='+', default=["hellaswag"], 
@@ -29,7 +31,8 @@ def parse_args():
                        help="Batch size for processing")
     parser.add_argument("--device", type=str, default="auto",
                        help="Device to use (auto, cpu, cuda)")
-    return parser
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    return parser.parse_args()
 
 
 def main():
@@ -48,23 +51,29 @@ def main():
 
     # Load pretrained model
     logging.info("Loading pretrained model for evaluation...")
-    config = AutoConfig.from_pretrained(args.model_name_or_config)
+    
     if args.model_type == "hf":
-        model = AutoModelForCausalLM.from_pretrained(config)
+        model = AutoModelForCausalLM.from_pretrained(args.model_name_or_config_path)
     if args.model_type == "sparse":
+        config = AutoConfig.from_pretrained(args.model_name_or_config_path)
         model = AutoModelForCausalLM.from_pretrained(config._name_or_path, config=config)
-        for layer_idx, layer in enumerate(model.get_decoder().layers):
-            layer_path = os.path.join(args.sp_dir, f"final_predictor_layer_{layer_idx}")
-            if not os.path.exists(layer_path):
-                logger.error(f"Pretrained weights for sparse predictor at layer {layer_idx} do not exist.")
-                return
-            pretrained_dict = torch.load(layer_path)
-            layer.mlp_lora_proj.load_state_dict(pretrained_dict)
+        if args.disable_sparsity:
+            model.set_skip_active(False)
+        else:
+            for layer_idx, layer in enumerate(model.get_decoder().layers):
+                layer_path = os.path.join(args.sp_dir, f"final_predictor_layer_{layer_idx}")
+                if not os.path.exists(layer_path):
+                    logger.error(f"Pretrained weights for sparse predictor at layer {layer_idx} do not exist.")
+                    return
+                pretrained_dict = torch.load(layer_path)
+                layer.mlp_lora_proj.load_state_dict(pretrained_dict)
         model.tie_weights()
         model.reset_cache()
+        
 
     wrapped_model = HFLM(
         pretrained=model,
+        backend="causal",
         batch_size=args.batch_size,
         device=device
     )

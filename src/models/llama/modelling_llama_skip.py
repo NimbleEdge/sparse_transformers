@@ -51,15 +51,16 @@ class LlamaSkipDecoderLayer(SkipDecoderLayer):
         self.input_layernorm = LlamaSkipRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = LlamaSkipRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
-    def _set_mlp_train(self, config):
+    def _set_mlp_train(self, config, layer_idx):
         self.mlp = LlamaMLP(config)
 
-    def _set_mlp_inference(self, config):
+    def _set_mlp_inference(self, config, layer_idx):
         self.mlp = SkipMLP(
             config.hidden_size,
             config.intermediate_size,
             config.sparsity,
             config.mlp_bias,
+            "silu"
         )
 
 

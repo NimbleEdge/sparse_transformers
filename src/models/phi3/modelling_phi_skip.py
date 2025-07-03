@@ -31,7 +31,7 @@ logger = logging.get_logger(__name__)
 
 class Phi3SkipMLP(SkipMLP):
     def __init__(self, hidden_size, intermediate_size, sparsity):
-        super().__init__(hidden_size, intermediate_size, sparsity, False)
+        super().__init__(hidden_size, intermediate_size, sparsity, False, "silu")
         self.gate_up_proj = nn.Linear(hidden_size, 2 * intermediate_size, bias=False)
 
     def _fix_unloaded_weights(self):
@@ -50,10 +50,10 @@ class Phi3SkipDecoderLayer(SkipDecoderLayer):
         self.resid_attn_dropout = nn.Dropout(config.resid_pdrop)
         self.resid_mlp_dropout = nn.Dropout(config.resid_pdrop)
 
-    def _set_mlp_train(self, config):
+    def _set_mlp_train(self, config, layer_idx):
         self.mlp = Phi3MLP(config)
 
-    def _set_mlp_inference(self, config):
+    def _set_mlp_inference(self, config, layer_idx):
         self.mlp = Phi3SkipMLP(
             config.hidden_size,
             config.intermediate_size,

@@ -33,15 +33,16 @@ class MistralSkipDecoderLayer(SkipDecoderLayer):
         self.input_layernorm = MistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.post_attention_layernorm = MistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
-    def _set_mlp_train(self, config):
+    def _set_mlp_train(self, config, layer_idx):
         self.mlp = MistralMLP(config)
 
-    def _set_mlp_inference(self, config):
+    def _set_mlp_inference(self, config, layer_idx):
         self.mlp = SkipMLP(
             config.hidden_size,
             config.intermediate_size,
             config.sparsity,
             False,
+            "silu"
         )
 
 class MistralSkipPreTrainedModel(PreTrainedModel):
