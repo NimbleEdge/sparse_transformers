@@ -124,8 +124,6 @@ def analyze_sparsity(args, model_name, device):
                 sum(layer_sparsities[layer_idx]) * 100/ len(layer_sparsities[layer_idx])
                 for layer_idx in range(len(layer_sparsities))
             ]
-
-        json.dump(analyzer.mlp_sparsity, open(os.path.join(args.output_dir, "sparsity.json"), "w"))
     finally:
         analyzer.model.activation_capture.remove_hooks()
     return analyzer.mlp_sparsity
@@ -138,7 +136,7 @@ def plot_sparsities(args, device):
         model_sparsities = analyze_sparsity(args, model, device)
         for k, v in model_sparsities.items():
             outs[k][model_name] = v
-
+    json.dump(outs, open(os.path.join(args.output_dir, "sparsity.json"), "w"))
     for k, outs_k in outs.items():
         plt.figure(figsize=(10, 6))
         for model_name, model_sparsities in outs_k.items():
