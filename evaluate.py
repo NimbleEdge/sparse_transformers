@@ -4,9 +4,7 @@ import logging
 
 import torch
 
-from transformers.trainer_utils import set_seed
 from transformers import AutoConfig, AutoModelForCausalLM
-from lm_eval.models import HFLM
 from lm_eval import simple_evaluate
 from lm_eval.utils import make_table
 from lm_eval.models.huggingface import HFLM
@@ -34,9 +32,6 @@ def parse_args():
 
 def main():
     args = parse_args()
-
-    # Set seed
-    set_seed(args.seed)
     
     # Setup device
     if args.device == "auto":
