@@ -20,6 +20,7 @@ from transformers.utils import logging
 from transformers.utils.import_utils import is_torch_flex_attn_available
 
 from sparse_transformers import WeightCache, sparse_mlp_forward
+from src.activation_capture import ActivationCaptureDefault
 
 if is_torch_flex_attn_available():
     from torch.nn.attention.flex_attention import BlockMask
@@ -350,6 +351,8 @@ def build_skip_connection_model(pretrained_model_class: type[PreTrainedModel]) -
 
 
 def build_skip_connection_model_for_causal_lm(pretrained_model_class: type[PreTrainedModel], base_model_class: type[PreTrainedModel]):
+    ACTIVATION_CAPTURE = ActivationCaptureDefault
+
     class SkipConnectionModelForCausalLM(pretrained_model_class, GenerationMixin):
         _tied_weights_keys = ["lm_head.weight"]
         _tp_plan = {"lm_head": "colwise_rep"}
@@ -374,6 +377,8 @@ def build_skip_connection_model_for_causal_lm(pretrained_model_class: type[PreTr
             self.model = base_model_class(config)
             self.vocab_size = config.vocab_size
             self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+            if config.capture_activations is not None:
+                self.activation_capture = ACTIVATION_CAPTURE(self)
 
             # Initialize weights and apply final processing
             self.post_init()

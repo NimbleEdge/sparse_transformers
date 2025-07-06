@@ -7,7 +7,4 @@ from .modelling_mistral_skip import MistralSkipConnectionForCausalLM
 AutoConfig.register("mistral-skip", MistralSkipConnectionConfig)
 AutoModelForCausalLM.register(MistralSkipConnectionConfig, MistralSkipConnectionForCausalLM)
 
-from src.activation_capture import register_activation_capture, ActivationCaptureDefault
-register_activation_capture('mistral', ActivationCaptureDefault)
-
 __all__ = [configuration_mistral_skip, modelling_mistral_skip]

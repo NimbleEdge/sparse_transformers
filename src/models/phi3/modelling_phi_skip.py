@@ -25,7 +25,7 @@ if is_torch_flex_attn_available():
 
 from src.models.phi3.configuration_phi_skip import Phi3SkipConnectionConfig
 from src.modeling_skip import SkipMLP, SkipDecoderLayer, FastLoRAProjection, build_skip_connection_model, build_skip_connection_model_for_causal_lm
-
+from .activation_capture_phi import ActivationCapturePhi3
 logger = logging.get_logger(__name__)
 
 
@@ -339,6 +339,8 @@ class Phi3SkipConnectionModel(Phi3SkipConnectionModelBase):
 Phi3SkipConnectionForCausalLMBase = build_skip_connection_model_for_causal_lm(Phi3SkipPreTrainedModel, Phi3SkipConnectionModel)
 
 class Phi3SkipConnectionForCausalLM(Phi3SkipConnectionForCausalLMBase):
+    ACTIVATION_CAPTURE = ActivationCapturePhi3
+
     _keys_to_ignore_on_load_missing = [
         "model.layers.*.mlp.combined_proj_buffer",
         "model.layers.*.mlp.down_proj_buffer",
