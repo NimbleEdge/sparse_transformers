@@ -1,5 +1,6 @@
 import argparse
 from collections import defaultdict
+import json
 import logging
 import os
 from typing import Dict
@@ -53,28 +54,27 @@ class ContextualSparsityAnalyzer:
 
         # Compute sparsity
         for layer_idx in range(self.num_layers):
-            if layer_idx in self.model.activation_capture.hidden_states:
-                sparsity_masks_gate = (
-                    self.model.activation_capture.get_gate_activations(layer_idx) <= 0
-                )
-                sparsity_masks_up = (
-                    self.model.activation_capture.get_mlp_activations(layer_idx) <= 0
-                )
+            sparsity_masks_gate = (
+                self.model.activation_capture.get_gate_activations(layer_idx) <= 0
+            )
+            sparsity_masks_up = (
+                self.model.activation_capture.get_up_activations(layer_idx) <= 0
+            )
 
-                # Naive sparsity computation
-                self.mlp_sparsity["gate"][layer_idx].append(
-                    sparsity_masks_gate.float().mean().item()
-                )
-                self.mlp_sparsity["up"][layer_idx].append(
-                    sparsity_masks_up.float().mean().item()
-                )
+            # Naive sparsity computation
+            self.mlp_sparsity["gate"][layer_idx].append(
+                sparsity_masks_gate.float().mean().item()
+            )
+            self.mlp_sparsity["up"][layer_idx].append(
+                sparsity_masks_up.float().mean().item()
+            )
 
-                # Level of sparsity after union over batch dim
-                # union_sparsity_mask = sparsity_masks.any(dim=0)
-                # self.union_sparsity[batch_size][layer_idx].append(union_sparsity_mask.float().mean().item())
+            # Level of sparsity after union over batch dim
+            # union_sparsity_mask = sparsity_masks.any(dim=0)
+            # self.union_sparsity[batch_size][layer_idx].append(union_sparsity_mask.float().mean().item())
 
-                # TODO: Add HNSW sparsity computation for both attn heads and mlp neurons
-                # TODO: Compute union sparsity over multiple different batch sizes
+            # TODO: Add HNSW sparsity computation for both attn heads and mlp neurons
+            # TODO: Compute union sparsity over multiple different batch sizes
 
         # Clear GPU tensors from capture to free memory
         self.model.activation_capture.clear_captures()
@@ -121,15 +121,11 @@ def analyze_sparsity(args, model_name, device):
 
         for key, layer_sparsities in analyzer.mlp_sparsity.items():
             analyzer.mlp_sparsity[key] = [
-                sum(layer_sparsities[layer_idx]) / len(layer_sparsities[layer_idx])
+                sum(layer_sparsities[layer_idx]) * 100/ len(layer_sparsities[layer_idx])
                 for layer_idx in range(len(layer_sparsities))
             ]
-            for layer_idx in range(len(layer_sparsities)):
-                analyzer.mlp_sparsity[key][layer_idx] = sum(
-                    layer_sparsities[layer_idx]
-                ) / len(layer_sparsities[layer_idx])
 
-        # TODO: Print/save logs and sparsity statistics
+        json.dump(analyzer.mlp_sparsity, open(os.path.join(args.output_dir, "sparsity.json"), "w"))
     finally:
         analyzer.model.activation_capture.remove_hooks()
     return analyzer.mlp_sparsity
@@ -146,16 +142,14 @@ def plot_sparsities(args, device):
     for k, outs_k in outs.items():
         plt.figure(figsize=(10, 6))
         for model_name, model_sparsities in outs_k.items():
-            plt.plot(range(len(model_sparsities)), model_sparsities, label=model_name)
-        plt.xlabel("Layer Index")
+            plt.plot([i*100/len(model_sparsities) for i in range(len(model_sparsities))], model_sparsities, label=model_name)
+        plt.xlabel("Layer Index Percentage (layer_idx/num_layers)")
         plt.ylabel(f"% of Neurons Inactive")
         plt.title(f"{k.capitalize()} Sparsity By Layer")
         plt.legend()
         plt.minorticks_on()
-
-    if args.save_plots:
         plt.savefig(
-            os.path.join(args.output_dir, "sparsity_analysis.png"),
+            os.path.join(args.output_dir, f"{k.capitalize()}_sparsity_analysis.png"),
             dpi=300,
             bbox_inches="tight",
         )

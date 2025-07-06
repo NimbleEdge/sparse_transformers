@@ -91,11 +91,17 @@ class ActivationCaptureDefault(ActivationCapture):
         return handle
     
     def get_gate_activations(self, layer_idx):
-        """Get combined MLP activations for a layer."""
         gate_key = f"{layer_idx}_gate"
         if gate_key in self.mlp_activations:
             gate_act = self.mlp_activations[gate_key]
             return F.silu(gate_act)
+        return None
+
+    def get_up_activations(self, layer_idx):
+        up_key = f"{layer_idx}_up"
+        if up_key in self.mlp_activations:
+            up_act = self.mlp_activations[up_key]
+            return up_act
         return None
 
 class ActivationCaptureTraining(ActivationCaptureDefault):
