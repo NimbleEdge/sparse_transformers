@@ -105,7 +105,7 @@ def main():
     parser.add_argument("--val_split", type=float, default=0.1, help="Validation split fraction")
     parser.add_argument("--cache_size", type=int, default=50, help="Number of .npz chunk files to cache in memory")
     parser.add_argument("--load_full_dataset", action="store_true", help="Load full dataset into memory at initialization (faster but uses more memory)")
-    parser.add_argument("--checkpoint_save_interval", type=int, default=1000, help="Save checkpoint every N steps")
+    parser.add_argument("--checkpoint_save_interval", type=int, default=20000, help="Save checkpoint every N steps")
     parser.add_argument("--resume_from_checkpoint", action="store_true", help="Resume training from the latest checkpoint")
     parser.add_argument("--checkpoint_path", type=str, default=None, help="Specific checkpoint path to resume from (optional)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")

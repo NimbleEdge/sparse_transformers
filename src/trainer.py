@@ -1,19 +1,16 @@
+import csv
 import logging
 import os
-import csv
+from typing import Any, Dict, Optional
+
 import numpy as np
-from typing import Dict, Optional, Any
-import torch.utils.data
-
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+import torch.utils.data
 from torch.utils.data import DataLoader, Dataset as TorchDataset
-from transformers.optimization import get_linear_schedule_with_warmup
-
-
-import wandb
 from tqdm import tqdm
+from transformers.optimization import get_linear_schedule_with_warmup
+import wandb
 
 from src.modeling_skip import FastLoRAProjection
 
@@ -703,23 +700,25 @@ class MultiLayerPredictorTrainer:
     """Trainer that coordinates training across multiple layers using shared dataset with LoRA hyperparameter grid support."""
 
     def __init__(
-        self, 
-        config, 
-        layer_indices: list[int], 
+        self,
+        config,
+        layer_indices: list[int],
         device: torch.device,
-        lora_size: Optional[int] = None, 
-        lora_sizes: Optional[list[float]] = None
+        lora_size: Optional[int] = None,
+        lora_sizes: Optional[list[float]] = None,
     ):
         self.config = config
         self.layer_indices = layer_indices
         self.device = device
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
-        
+
         # Setup LoRA size grid
         if lora_sizes is not None:
             # Convert percentages to absolute sizes
-            self.lora_sizes = [int(self.intermediate_size * pct / 100) for pct in lora_sizes]
+            self.lora_sizes = [
+                int(self.intermediate_size * pct / 100) for pct in lora_sizes
+            ]
             self.lora_size_percentages = lora_sizes
         elif lora_size is not None:
             self.lora_sizes = [lora_size]
@@ -727,9 +726,14 @@ class MultiLayerPredictorTrainer:
         else:
             # Default grid: 4%, 10%, 20%, 30%
             self.lora_size_percentages = [4.0, 10.0, 20.0, 30.0]
-            self.lora_sizes = [int(self.intermediate_size * pct / 100) for pct in self.lora_size_percentages]
-        
-        logger.info(f"LoRA size grid: {dict(zip(self.lora_size_percentages, self.lora_sizes))}")
+            self.lora_sizes = [
+                int(self.intermediate_size * pct / 100)
+                for pct in self.lora_size_percentages
+            ]
+
+        logger.info(
+            f"LoRA size grid: {dict(zip(self.lora_size_percentages, self.lora_sizes))}"
+        )
 
         # Will store individual layer trainers for each configuration
         self.layer_trainers = {}  # Key: (layer_idx, lora_size)
@@ -794,9 +798,11 @@ class MultiLayerPredictorTrainer:
         # Train each layer with each LoRA size (hyperparameter grid)
         for lora_size, lora_pct in zip(self.lora_sizes, self.lora_size_percentages):
             logger.info(f"Training with LoRA size {lora_size} ({lora_pct:.1f}%)")
-            
+
             for layer_idx in self.layer_indices:
-                logger.info(f"Starting training for layer {layer_idx} with LoRA size {lora_size}")
+                logger.info(
+                    f"Starting training for layer {layer_idx} with LoRA size {lora_size}"
+                )
 
                 # Get or create trainer for this layer and LoRA size
                 trainer_key = (layer_idx, lora_size)
@@ -828,14 +834,18 @@ class MultiLayerPredictorTrainer:
                             layer_checkpoint_path = checkpoint_path
                     else:
                         # Look for latest checkpoint for this layer
-                        layer_checkpoint_path = None  # Let trainer find latest automatically
+                        layer_checkpoint_path = (
+                            None  # Let trainer find latest automatically
+                        )
 
                 # Update wandb to include LoRA size if using wandb
                 if use_wandb:
-                    wandb.log({
-                        f"layer_{layer_idx}_lora_{lora_pct:.1f}%/lora_size": lora_size,
-                        f"layer_{layer_idx}_lora_{lora_pct:.1f}%/lora_pct": lora_pct,
-                    })
+                    wandb.log(
+                        {
+                            f"layer_{layer_idx}_lora_{lora_pct:.1f}%/lora_size": lora_size,
+                            f"layer_{layer_idx}_lora_{lora_pct:.1f}%/lora_pct": lora_pct,
+                        }
+                    )
 
                 # Train predictor for this layer
                 trainer.train_layer(
@@ -853,13 +863,19 @@ class MultiLayerPredictorTrainer:
 
                 # Save final predictor for this layer and LoRA size
                 if save_dir:
-                    model_name = f"final_predictor_layer_{layer_idx}_lora_{lora_pct:.1f}pct"
+                    model_name = (
+                        f"final_predictor_layer_{layer_idx}_lora_{lora_pct:.1f}pct"
+                    )
                     trainer.save_predictor(save_dir, name=model_name)
                     logger.info(f"Saved final predictor: {model_name}")
 
-                logger.info(f"Completed training for layer {layer_idx} with LoRA size {lora_size}")
-        
-        logger.info(f"Completed all training - {len(self.layer_indices)} layers × {len(self.lora_sizes)} LoRA sizes = {len(self.layer_indices) * len(self.lora_sizes)} total experiments")
+                logger.info(
+                    f"Completed training for layer {layer_idx} with LoRA size {lora_size}"
+                )
+
+        logger.info(
+            f"Completed all training - {len(self.layer_indices)} layers × {len(self.lora_sizes)} LoRA sizes = {len(self.layer_indices) * len(self.lora_sizes)} total experiments"
+        )
 
     def save_all_predictors(self, save_dir: str):
         """Save all trained predictors."""
