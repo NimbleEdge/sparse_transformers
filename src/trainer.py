@@ -261,10 +261,10 @@ class LayerwisePredictorTrainer:
                 
                 # Get predictions
                 pred_scores = self.predictor(hidden_states)
-                pred_mask = (F.sigmoid(pred_scores) >= 0.5)
+                pred_mask = pred_scores > 0.0
                 
                 # Get ground truth
-                gt_mask = (mlp_activations > 0)
+                gt_mask = (mlp_activations > 0.0)
                 tp = (pred_mask * gt_mask).sum().item()
                 fp = (pred_mask * (~gt_mask)).sum().item()
                 fn = ((~pred_mask) * gt_mask).sum().item()
