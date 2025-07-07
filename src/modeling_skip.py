@@ -20,6 +20,7 @@ from transformers.utils import logging
 from transformers.utils.import_utils import is_torch_flex_attn_available
 
 from sparse_transformers import WeightCache, sparse_mlp_forward
+from src.activation_capture import ActivationCaptureDefault
 
 if is_torch_flex_attn_available():
     from torch.nn.attention.flex_attention import BlockMask
@@ -36,16 +37,19 @@ class FastLoRAProjection(nn.Module):
         # Force creation of linear layers with actual tensors (not meta tensors)
         self.down = nn.Linear(hidden_size, lora_size, bias=False)
         self.up = nn.Linear(lora_size, intermediate_size, bias=False)
-    
+
     def _fix_unloaded_weights(self):
         out = self.to_empty(device="cpu")
-        with torch.no_grad():
-            torch.nn.init.xavier_normal_(out.down.weight)
-            torch.nn.init.zeros_(out.up.weight)  # Initialize up projection to zeros for stable training
+        self._init_weights()
         return out
+
+    def _init_weights(self):
+        with torch.no_grad():
+            torch.nn.init.xavier_normal_(self.down.weight)
+            torch.nn.init.xavier_normal_(self.up.weight)
    
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return torch.mm(torch.mm(x, self.down.weight.t()), self.up.weight.t())
+        return self.up(self.down(x))
                      
 class SkipMLP(nn.Module):
     def __init__(self, hidden_size: int, intermediate_size: int, sparsity: float, bias: bool = False, act_fn="silu"):
@@ -347,6 +351,8 @@ def build_skip_connection_model(pretrained_model_class: type[PreTrainedModel]) -
 
 
 def build_skip_connection_model_for_causal_lm(pretrained_model_class: type[PreTrainedModel], base_model_class: type[PreTrainedModel]):
+    ACTIVATION_CAPTURE = ActivationCaptureDefault
+
     class SkipConnectionModelForCausalLM(pretrained_model_class, GenerationMixin):
         _tied_weights_keys = ["lm_head.weight"]
         _tp_plan = {"lm_head": "colwise_rep"}
@@ -371,6 +377,8 @@ def build_skip_connection_model_for_causal_lm(pretrained_model_class: type[PreTr
             self.model = base_model_class(config)
             self.vocab_size = config.vocab_size
             self.lm_head = nn.Linear(config.hidden_size, config.vocab_size, bias=False)
+            if config.capture_activations is not None:
+                self.activation_capture = ACTIVATION_CAPTURE(self)
 
             # Initialize weights and apply final processing
             self.post_init()

@@ -7,12 +7,43 @@ based on the hidden states before each MLP layer. Uses the last token representa
 from the generated datasets.
 
 Usage:
-    # Start fresh training
+    # Start fresh training for single layer
     python train.py \
         --config meta-llama/Llama-2-7b-hf \
         --dataset_dir ./data/c4 \
         --output_dir ./trained_predictors \
-        --layer_idx 0 \
+        --layer_indices 0 \
+        --batch_size 32 \
+        --num_epochs 10 \
+        --learning_rate 1e-5
+    
+    # Start fresh training for multiple layers
+    python train.py \
+        --config meta-llama/Llama-2-7b-hf \
+        --dataset_dir ./data/c4 \
+        --output_dir ./trained_predictors \
+        --layer_indices 0 1 2 3 \
+        --batch_size 32 \
+        --num_epochs 10 \
+        --learning_rate 1e-5
+    
+    # Train predictors for ALL layers automatically
+    python train.py \
+        --config meta-llama/Llama-2-7b-hf \
+        --dataset_dir ./data/c4 \
+        --output_dir ./trained_predictors \
+        --layer_indices all \
+        --batch_size 32 \
+        --num_epochs 10 \
+        --learning_rate 1e-5
+    
+    # Train predictors with hyperparameter grid (different LoRA sizes)
+    python train.py \
+        --config meta-llama/Llama-2-7b-hf \
+        --dataset_dir ./data/c4 \
+        --output_dir ./trained_predictors \
+        --layer_indices 0 1 2 \
+        --lora_sizes 4.0 10.0 20.0 30.0 \
         --batch_size 32 \
         --num_epochs 10 \
         --learning_rate 1e-5
@@ -22,7 +53,7 @@ Usage:
         --config meta-llama/Llama-2-7b-hf \
         --dataset_dir ./data/c4 \
         --output_dir ./trained_predictors \
-        --layer_idx 0 \
+        --layer_indices 0 1 2 \
         --batch_size 32 \
         --num_epochs 10 \
         --learning_rate 1e-5 \
@@ -33,7 +64,7 @@ Usage:
         --config meta-llama/Llama-2-7b-hf \
         --dataset_dir ./data/c4 \
         --output_dir ./trained_predictors \
-        --layer_idx 0 \
+        --layer_indices 0 \
         --batch_size 32 \
         --num_epochs 10 \
         --learning_rate 1e-5 \
@@ -53,12 +84,11 @@ import wandb
 
 from transformers.trainer_utils import set_seed
 
-from src.trainer import LayerwisePredictorTrainer, StreamingSparsityDataset
+from src.trainer import MultiLayerPredictorTrainer
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
 
 
 def main():
@@ -66,15 +96,16 @@ def main():
     parser.add_argument("--config", type=str, required=True, help="Path to model config file")
     parser.add_argument("--dataset_dir", type=str, required=True, help="Directory containing dataset.csv and arrays/")
     parser.add_argument("--output_dir", type=str, required=True, help="Output directory for trained models")
-    parser.add_argument("--layer_idx", type=int, required=True, help="Which layer to train predictor for")
+    parser.add_argument("--layer_indices", nargs='+', required=True, help="Which layers to train predictors for (can specify multiple layer numbers or 'all' for all layers)")
     parser.add_argument("--batch_size", type=int, default=64, help="Training batch size")
     parser.add_argument("--num_epochs", type=int, default=10, help="Number of training epochs")
     parser.add_argument("--learning_rate", type=float, default=1e-5, help="Learning rate")
     parser.add_argument("--lora_size", type=int, default=None, help="LoRA bottleneck size (default: 4% of intermediate_size)")
-    parser.add_argument("--val_split", type=float, default=0.2, help="Validation split fraction")
+    parser.add_argument("--lora_sizes", nargs='+', type=float, default=None, help="LoRA sizes as percentages (e.g., 4.0 10.0 20.0 30.0)")
+    parser.add_argument("--val_split", type=float, default=0.1, help="Validation split fraction")
     parser.add_argument("--cache_size", type=int, default=50, help="Number of .npz chunk files to cache in memory")
     parser.add_argument("--load_full_dataset", action="store_true", help="Load full dataset into memory at initialization (faster but uses more memory)")
-    parser.add_argument("--checkpoint_save_interval", type=int, default=1000, help="Save checkpoint every N steps")
+    parser.add_argument("--checkpoint_save_interval", type=int, default=20000, help="Save checkpoint every N steps")
     parser.add_argument("--resume_from_checkpoint", action="store_true", help="Resume training from the latest checkpoint")
     parser.add_argument("--checkpoint_path", type=str, default=None, help="Specific checkpoint path to resume from (optional)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
@@ -100,87 +131,63 @@ def main():
     # Load config
     config = AutoConfig.from_pretrained(args.config)
     
-    # Calculate LoRA size if not provided
-    if args.lora_size is None:
-        lora_size = int(config.intermediate_size * 0.04)  # 4% of intermediate size
+    # Handle 'all' option for layer_indices
+    if len(args.layer_indices) == 1 and args.layer_indices[0] == "all":
+        # Get number of layers from config
+        num_layers = getattr(config, 'num_hidden_layers', None) or getattr(config, 'n_layer', None) or getattr(config, 'num_layers', None)
+        if num_layers is None:
+            raise ValueError("Could not determine number of layers from config. Please specify layer indices explicitly.")
+        args.layer_indices = list(range(num_layers))
+        logger.info(f"Training predictors for all {num_layers} layers: {args.layer_indices}")
     else:
-        lora_size = args.lora_size
+        # Convert to integers
+        try:
+            args.layer_indices = [int(idx) for idx in args.layer_indices]
+        except ValueError:
+            raise ValueError("Layer indices must be integers or 'all'")
+        logger.info(f"Training predictors for specified layers: {args.layer_indices}")
     
     logger.info(f"Model config: hidden_size={config.hidden_size}, intermediate_size={config.intermediate_size}")
-    logger.info(f"Training predictor for layer {args.layer_idx} with LoRA size {lora_size}")
     
-    # Initialize wandb
+    # Initialize wandb for multi-layer training
     if args.use_wandb:
         wandb.init(
             entity=args.wandb_entity,
             project=args.wandb_project,
             config=vars(args),
-            name=f"predictor-layer-{args.layer_idx}-training-{int(time.time())}"
+            name=f"predictor-layers-{'-'.join(map(str, args.layer_indices))}-training-{int(time.time())}"
         )
 
-    # Initialize trainer
-    trainer = LayerwisePredictorTrainer(
-        layer_idx=args.layer_idx,
-        hidden_size=config.hidden_size, 
-        intermediate_size=config.intermediate_size, 
-        lora_size=lora_size, 
-        device=device
+    # Initialize multi-layer trainer
+    trainer = MultiLayerPredictorTrainer(
+        config=config,
+        layer_indices=args.layer_indices,
+        device=device,
+        lora_size=args.lora_size,
+        lora_sizes=args.lora_sizes
     )
     
-    # Load streaming datasets
-    dataset_mode = "full dataset in memory" if args.load_full_dataset else "streaming with chunk cache"
-    logger.info(f"Loading dataset for layer {args.layer_idx} using {dataset_mode}")
-    full_dataset = StreamingSparsityDataset(args.dataset_dir, args.layer_idx, cache_size=args.cache_size, load_full_dataset=args.load_full_dataset)
-    
-    # Create train/validation split
-    total_samples = len(full_dataset)
-    val_size = int(total_samples * args.val_split)
-    train_size = total_samples - val_size
-    
-    # Use torch's random_split for the streaming dataset
-    train_dataset, val_dataset = torch.utils.data.random_split(
-        full_dataset, [train_size, val_size], 
-        generator=torch.Generator().manual_seed(args.seed)
-    )
-    
-    logger.info(f"Using {len(train_dataset)} training samples, {len(val_dataset)} validation samples")
-    logger.info(f"Checkpoints will be saved every {args.checkpoint_save_interval} steps to {args.output_dir}")
-    
-    # Handle specific checkpoint path for resuming
-    if args.checkpoint_path and args.resume_from_checkpoint:
-        logger.info(f"Will attempt to resume from specific checkpoint: {args.checkpoint_path}")
-        # Temporarily override the trainer to load from specific checkpoint
-        if os.path.exists(args.checkpoint_path):
-            # This will be handled in the trainer's resume logic
-            pass
-        else:
-            logger.error(f"Specified checkpoint path does not exist: {args.checkpoint_path}")
-            return
-    elif args.resume_from_checkpoint:
-        logger.info("Will attempt to resume from latest checkpoint")
-    
-    # Train predictor
-    trainer.train_layer(
-        train_dataset=train_dataset,
-        val_dataset=val_dataset,
+    # Train all layers
+    trainer.train_all_layers(
+        dataset_dir=args.dataset_dir,
         num_epochs=args.num_epochs,
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,
+        val_split=args.val_split,
+        cache_size=args.cache_size,
+        load_full_dataset=args.load_full_dataset,
         use_wandb=args.use_wandb,
         save_dir=args.output_dir,
         save_interval=args.checkpoint_save_interval,
         resume_from_checkpoint=args.resume_from_checkpoint,
-        checkpoint_path=args.checkpoint_path
+        checkpoint_path=args.checkpoint_path,
+        seed=args.seed
     )
-            
-    # Save final predictor
-    trainer.save_predictor(args.output_dir, name=f"final_predictor_layer_{args.layer_idx}")
-    logger.info(f"Saved final predictor for layer {args.layer_idx}")
-    
+
     if args.use_wandb:
         wandb.finish()
     
-    logger.info("Training completed!")
+    logger.info(f"Training completed for all layers: {args.layer_indices}")
 
 
 if __name__ == "__main__":

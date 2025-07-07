@@ -16,6 +16,7 @@ def build_skip_config(base_config_class: type[PretrainedConfig], model_type_name
                     predictor_loss_alpha: float = 1.0,
                     predictor_loss_weight: float = 0.1,
                     use_optimized_weight_cache: bool = True,
+                    capture_activations: str = None,
                     **kwargs):
             self._sparsity = sparsity
             self.predictor_loss_type = predictor_loss_type
@@ -23,6 +24,7 @@ def build_skip_config(base_config_class: type[PretrainedConfig], model_type_name
             self.predictor_loss_alpha = predictor_loss_alpha
             self.predictor_loss_weight = predictor_loss_weight
             self.use_optimized_weight_cache = use_optimized_weight_cache
+            self.capture_activations = capture_activations
             super().__init__(**kwargs)
         
         @property

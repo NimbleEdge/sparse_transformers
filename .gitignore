@@ -23,6 +23,8 @@ wheels/
 .cursorrules
 trained_predictors/
 wandb/
+data/
+logs/
 # CUDA
 *.i
 *.ii

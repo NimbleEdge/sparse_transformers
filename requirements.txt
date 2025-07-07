@@ -11,5 +11,6 @@ datasets
 sentencepiece
 protobuf
 wandb
+ninja
 timm
 pillow
