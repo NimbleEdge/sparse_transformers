@@ -68,7 +68,7 @@ class ActivationCaptureDefault(ActivationCapture):
     has_up_proj: bool = True
 
     def get_layers(self):
-        return self.model.model.layers
+        return self.model.get_decoder().layers
 
     def _create_mlp_hook(self, layer_idx, proj_type):
         def hook(module, input, output):
