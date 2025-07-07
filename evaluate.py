@@ -60,8 +60,9 @@ def main():
 
     wrapped_model = HFLM(
         pretrained=model,
+        backend="causal",
         batch_size=args.batch_size,
-        device=device
+        device=device,
     )
 
     logging.info("Beginning evaluation...")

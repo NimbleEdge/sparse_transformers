@@ -23,6 +23,8 @@ def parse_args() -> argparse.Namespace:
                       help='Verbose output')
     parser.add_argument('--config', type=str, default='configs/llama_skip_causal_3b.json',
                       help='Config file')
+    parser.add_argument('--max_response_length', type=int, default=-1,
+                      help='Maximum response tokens per prompt.')
     return parser.parse_args()
 
 
@@ -400,6 +402,9 @@ def main():
 
     # Get test prompts
     test_prompts = get_diverse_test_prompts()
+    if args.max_response_length > 0:
+        for prompt in test_prompts:
+            prompt['max_tokens'] = min(prompt['max_tokens'], args.max_response_length)
     
     print(f"\n🎯 Running comprehensive benchmark with {len(test_prompts)} diverse prompts...")
     print(f"📝 Test prompts: {[p['description'] for p in test_prompts]}")
