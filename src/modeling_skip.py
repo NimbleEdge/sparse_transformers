@@ -141,11 +141,11 @@ class SkipDecoderLayer(ABC, GradientCheckpointingLayer):
         pass
 
     @abstractmethod
-    def _set_mlp_train(self, config, layer_idx):
+    def _set_mlp_train(self, config, layer_idx=None):
         pass
 
     @abstractmethod
-    def _set_mlp_inference(self, config, layer_idx):
+    def _set_mlp_inference(self, config, layer_idx=None):
         pass
 
     @property
