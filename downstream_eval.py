@@ -9,8 +9,7 @@ from lm_eval import simple_evaluate
 from lm_eval.utils import make_table
 from lm_eval.models.huggingface import HFLM
 
-import src.models   # to add models to registry
-
+import src.models
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -29,6 +28,8 @@ def parse_args():
                        help="Batch size for processing")
     parser.add_argument("--device", type=str, default="auto",
                        help="Device to use (auto, cpu, cuda)")
+    parser.add_argument("--lora_size", type=float, default=4.0,
+                       help="Size of lora predictors to use as percentage of total hidden size")
     return parser.parse_args()
 
 
@@ -45,13 +46,15 @@ def main():
 
     # Load pretrained model
     logging.info("Loading pretrained model for evaluation...")
-    config = AutoConfig.from_pretrained(args.model_name_or_config)
+    
     if args.model_type == "hf":
-        model = AutoModelForCausalLM.from_pretrained(config)
+        model = AutoModelForCausalLM.from_pretrained(args.model_name_or_config)
     if args.model_type == "sparse":
+        config = AutoConfig.from_pretrained(args.model_name_or_config)
+        config.lora_size = args.lora_size / 100.0
         model = AutoModelForCausalLM.from_pretrained(config._name_or_path, config=config)
         for layer_idx, layer in enumerate(model.get_decoder().layers):
-            layer_path = os.path.join(args.sp_dir, f"final_predictor_layer_{layer_idx}_lora4.0pct.pt")
+            layer_path = os.path.join(args.sp_dir, f"final_predictor_layer_{layer_idx}_lora_{args.lora_size}pct.pt")
             if not os.path.exists(layer_path):
                 logger.error(f"Pretrained weights for sparse predictor at layer {layer_idx} do not exist.")
                 return
@@ -62,9 +65,8 @@ def main():
 
     wrapped_model = HFLM(
         pretrained=model,
-        backend="causal",
         batch_size=args.batch_size,
-        device=device,
+        device=device
     )
 
     logging.info("Beginning evaluation...")

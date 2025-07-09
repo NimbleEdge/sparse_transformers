@@ -64,7 +64,7 @@ class SkipMLP(nn.Module):
         
         # Initialize mask but defer WeightCache creation until post_init
         self.init_mask = torch.ones(intermediate_size, dtype=torch.bool)
-        self.init_mask[int(intermediate_size * sparsity):] = 0
+        self.init_mask[int(intermediate_size * (1-sparsity)):] = 0
         
         self.weight_cache : Optional[WeightCache] = None
 
@@ -120,7 +120,8 @@ class SkipDecoderLayer(ABC, GradientCheckpointingLayer):
 
         intermediate_size = config.intermediate_size[layer_idx] if isinstance(config.intermediate_size, list) \
             else config.intermediate_size
-        self.lora_size = int(intermediate_size * 0.04)
+        lora_pct = 0.04 if not hasattr(config, "lora_size") else config.lora_size
+        self.lora_size = int(intermediate_size * lora_pct)
         self.mlp_lora_proj = FastLoRAProjection(
             config.hidden_size, 
             intermediate_size,
