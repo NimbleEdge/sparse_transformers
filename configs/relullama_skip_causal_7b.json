@@ -1,6 +1,6 @@
 {
     "_name_or_path": "SparseLLM/ReluLLaMA-7B",
-    "_sparsity": 0.3,
+    "sparsity": 0.3,
     "architectures": ["LlamaSkipConnectionForCausalLM"], 
     "bos_token_id": 1, 
     "eos_token_id": 2, 
