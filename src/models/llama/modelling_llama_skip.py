@@ -61,7 +61,7 @@ class LlamaSkipDecoderLayer(SkipDecoderLayer):
             config.intermediate_size,
             config.sparsity,
             config.mlp_bias,
-            "silu"
+            config.hidden_act
         )
 
 
