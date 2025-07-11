@@ -13,7 +13,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.trainer_utils import set_seed
 
 import matplotlib.pyplot as plt
-from src.activation_capture import ActivationCaptureDefault
+from src.activation_capture import Hook
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -28,16 +28,14 @@ class ContextualSparsityAnalyzer:
         self.tokenizer = tokenizer
         self.device = device
 
-        model.activation_capture = ActivationCaptureDefault(model)
-        model.activation_capture.register_hooks()
+        model.activation_capture = model.ACTIVATION_CAPTURE(model)
+        model.activation_capture.register_hooks(hooks=[Hook.ACT])
         self.num_layers = len(self.model.activation_capture.get_layers())
 
         self.reset_buffers()
 
     def reset_buffers(self):
-        self.mlp_sparsity = {}
-        self.mlp_sparsity["gate"] = defaultdict(list)
-        self.mlp_sparsity["up"] = defaultdict(list)
+        self.mlp_sparsity = defaultdict(list)
         self.num_seqs = 0
 
     def process_batch(self, input_ids: torch.Tensor, attention_mask: torch.Tensor):
@@ -54,26 +52,19 @@ class ContextualSparsityAnalyzer:
 
         # Compute sparsity
         for layer_idx in range(self.num_layers):
-            sparsity_masks_gate = (
-                self.model.activation_capture.get_gate_activations(layer_idx) <= 0
-            )
-            sparsity_masks_up = (
-                self.model.activation_capture.get_up_activations(layer_idx) <= 0
+            sparsity_masks = (
+                self.model.activation_capture.mlp_activations[Hook.ACT][layer_idx] <= 0
             )
 
             # Naive sparsity computation
             self.mlp_sparsity["gate"][layer_idx].append(
-                sparsity_masks_gate.float().mean().item()
-            )
-            self.mlp_sparsity["up"][layer_idx].append(
-                sparsity_masks_up.float().mean().item()
+                sparsity_masks.float().mean().item()
             )
 
             # Level of sparsity after union over batch dim
             # union_sparsity_mask = sparsity_masks.any(dim=0)
             # self.union_sparsity[batch_size][layer_idx].append(union_sparsity_mask.float().mean().item())
 
-            # TODO: Add HNSW sparsity computation for both attn heads and mlp neurons
             # TODO: Compute union sparsity over multiple different batch sizes
 
         # Clear GPU tensors from capture to free memory
