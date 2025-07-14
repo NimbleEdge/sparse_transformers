@@ -70,6 +70,18 @@ Usage:
         --learning_rate 1e-5 \
         --resume_from_checkpoint \
         --checkpoint_path ./trained_predictors/checkpoint_layer_0_step_5000.pt
+
+    # Resume only from best-performing lora size per layer
+    python train.py \
+        --config meta-llama/Llama-2-7b-hf \
+        --dataset_dir ./data/c4 \
+        --output_dir ./trained_predictors \
+        --layer_indices 0 \
+        --batch_size 32 \
+        --num_epochs 10 \
+        --learning_rate 1e-5 \
+        --resume_from_checkpoint \
+        --load_best_only
 """
 
 import argparse
@@ -108,6 +120,7 @@ def main():
     parser.add_argument("--checkpoint_save_interval", type=int, default=20000, help="Save checkpoint every N steps")
     parser.add_argument("--resume_from_checkpoint", action="store_true", help="Resume training from the latest checkpoint")
     parser.add_argument("--checkpoint_path", type=str, default=None, help="Specific checkpoint path to resume from (optional)")
+    parser.add_argument("--load_best_only", action="store_true", help="Resume training only from best performing lora size for each layer.")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     parser.add_argument("--use_wandb", action="store_true", help="Use Weights & Biases logging")
     parser.add_argument("--wandb_project", type=str, default="llama-skip-predictors", help="W&B project name")
@@ -180,6 +193,7 @@ def main():
         save_dir=args.output_dir,
         save_interval=args.checkpoint_save_interval,
         resume_from_checkpoint=args.resume_from_checkpoint,
+        load_best_only= args.load_best_only,
         checkpoint_path=args.checkpoint_path,
         seed=args.seed
     )
