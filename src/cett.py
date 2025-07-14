@@ -2,7 +2,7 @@ from collections import defaultdict
 import logging
 import os
 import json
-import tqdm
+from tqdm import tqdm
 import argparse
 
 from datasets import load_dataset
@@ -39,46 +39,16 @@ def calculate_threshold_one_token(neuron_outputs, cett_target, n_quantiles=1000)
     return threshold
 
 
-def find_threshold(model, dataloader, layer_idx, cett_target=0.2, n_quantiles=500):
-    model.activation_capture = model.ACTIVATION_CAPTURE(model)
-    model.activation_capture.register_hooks(hooks=[Hook.UP])
-
-    thresholds = defaultdict(list)
-    
-    with torch.no_grad():
-        for batch in dataloader:
-            input_ids = batch["input_ids"]
-            attention_mask = batch["attention_mask"]
-
-            model.activation_capture.clear_captures()
-        
-            _ = model(input_ids=input_ids, attention_mask=attention_mask)
-
-            for layer,layer_idx in enumerate(model.activation_capture.get_layers()):
-                activations = model.activation_capture.mlp_activations[Hook.UP][layer_idx]
-                activations = activations.view(-1, activations.size(-1))
-
-                for i in range(activations.size(0)):
-                    neuron_outputs = activations[i] * layer.mlp.down_proj.weight
-                    threshold = calculate_threshold_one_token(neuron_outputs, cett_target=cett_target, n_quantiles=n_quantiles)
-                    thresholds[layer_idx].append(threshold)
-
-    for layer_idx, layer_thresholds in thresholds.items():
-        thresholds[layer_idx] = sum(layer_thresholds) / len(layer_thresholds)
-
-    return thresholds
-
-
-
 def find_thresholds(
-        model_name, 
-        dataset_name, 
-        dataset_config,
-        max_samples, 
-        cett_target, 
-        n_quantiles,
-        save_path,
-        device,
+        model_name: str, 
+        dataset_name: str, 
+        dataset_config: str,
+        max_samples: int, 
+        cett_target: float, 
+        n_quantiles: int,
+        save_path: str,
+        seed: int,
+        device: torch.device,
     ):
 
     # Load tokenizer and model
@@ -96,7 +66,7 @@ def find_thresholds(
         model = model.to(device)
 
     model.eval()
-    model.activation_capture = model.ACTIVATION_CAPTURE(model)
+    model.activation_capture = ActivationCapture(model)
     model.activation_capture.register_hooks(hooks=[Hook.UP])
 
     # Load dataset
@@ -107,7 +77,7 @@ def find_thresholds(
         )
     else:
         dataset = load_dataset(dataset_name, split="train", streaming=True)
-    dataset = dataset.shuffle(buffer_size=10000, seed=42)
+    dataset = dataset.shuffle(buffer_size=10000, seed=seed)
 
     def sample_and_tokenize(examples):
         """Sample text chunks before tokenization for efficiency using vectorized operations."""
@@ -130,13 +100,12 @@ def find_thresholds(
     logger.info(f"Beginning to compute thresholds using {max_samples} samples")
     thresholds = defaultdict(list)
     with torch.no_grad():
-        for batch in tqdm.tqdm(dataloader):
+        for batch in tqdm(dataloader, total=max_samples):
             input_ids = batch["input_ids"].to(device)
-            attention_mask = batch["attention_mask"].to(device)
         
-            _ = model(input_ids=input_ids, attention_mask=attention_mask)
+            _ = model(input_ids.squeeze(0))
 
-            for layer,layer_idx in enumerate(model.activation_capture.get_layers()):
+            for layer_idx, layer in enumerate(model.activation_capture.get_layers()):
                 activations = model.activation_capture.mlp_activations[Hook.UP][layer_idx]
                 activations = activations.view(-1, activations.size(-1))
 
@@ -232,12 +201,13 @@ if __name__ == '__main__':
 
     find_thresholds(
         model_name=args.model_name, 
-        dataset_name=args.dataset_name, 
+        dataset_name=args.dataset, 
         dataset_config=args.dataset_config,
         max_samples=args.max_samples, 
         cett_target=args.cett_target, 
         n_quantiles=args.n_quantiles,
         save_path=args.save_path,
-        device=device
+        seed=args.seed,
+        device=device,
     )
                 

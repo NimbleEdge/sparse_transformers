@@ -11,7 +11,7 @@ class Hook(Enum):
 
 class ActivationCapture():
     """Helper class to capture activations from model layers."""
-    hooks_available: List[Hook]
+    hooks_available: List[Hook] = [Hook.IN, Hook.ACT, Hook.UP, Hook.OUT]
     
     def __init__(self, model):
         self.model = model
@@ -95,4 +95,6 @@ class ActivationCapture():
     
     def clear_captures(self):
         """Clear captured activations."""
-        self.mlp_activations = {}
+        self.mlp_activations = {
+            hook: {} for hook in self.hooks_available
+        }
