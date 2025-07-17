@@ -239,6 +239,8 @@ class StreamingSparsityDataset(TorchDataset):
             }
         
     def set_layer_idx(self, layer_idx):
+        if layer_idx == self.layer_idx:
+            return
         self.layer_idx = layer_idx
         if self.load_full_dataset:
             logger.info("Layer index changed with load_full_dataset=True. Reloading full dataset for new layer index...")
