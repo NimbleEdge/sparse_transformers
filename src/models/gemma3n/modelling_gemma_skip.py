@@ -27,7 +27,6 @@ from transformers.models.gemma3n.modeling_gemma3n import(
 from sparse_transformers import sparse_mlp_forward
 
 from src.models.gemma3n.configuration_gemma_skip import Gemma3nSkipConnectionConfig
-from src.models.gemma3n.activation_capture_gemma import ActivationCaptureGemma3n
 from src.modeling_skip import SkipMLP, SkipDecoderLayer, build_skip_connection_model, build_skip_connection_model_for_causal_lm
 
 logger = logging.get_logger(__name__)
@@ -413,7 +412,6 @@ class Gemma3nSkipConnectionModel(Gemma3nSkipConnectionModelBase):
 Gemma3nSkipConnectionForCausalLMBase = build_skip_connection_model_for_causal_lm(Gemma3nSkipPreTrainedModel, Gemma3nSkipConnectionModel)
 
 class Gemma3nSkipConnectionForCausalLM(Gemma3nSkipConnectionForCausalLMBase):
-    ACTIVATION_CAPTURE = ActivationCaptureGemma3n
     _tied_weights_keys = ["lm_head.weight"]
     _tp_plan = {"lm_head": "colwise_rep"}
     _pp_plan = {"lm_head": (["hidden_states"], ["logits"])}

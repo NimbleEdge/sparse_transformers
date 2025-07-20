@@ -1,54 +1,91 @@
-from typing_extensions import override
-import torch.nn.functional as F
-from abc import ABC, abstractmethod
+
+from enum import Enum
+from typing import List
+
+class Hook(Enum):
+    IN = "IN"
+    ACT = "ACT"
+    UP = "UP"
+    OUT = "OUT"
 
 
-class ActivationCapture(ABC):
+class ActivationCapture():
     """Helper class to capture activations from model layers."""
-    has_gate_proj: bool
-    has_up_proj: bool
+    hooks_available: List[Hook] = [Hook.IN, Hook.ACT, Hook.UP, Hook.OUT]
     
     def __init__(self, model):
         self.model = model
-        self.mlp_activations = {}
+        self.mlp_activations = {
+            hook: {} for hook in self.hooks_available
+        }
         self.handles = []
 
-    @abstractmethod
-    def _register_gate_hook(self, layer_idx, layer):
-        pass
+    def _register_in_hook(self, layer_idx, layer):
+        def hook(module, input, output):
+            # Just detach, don't clone or move to CPU yet
+            self.mlp_activations[Hook.IN][layer_idx] = input[0].clone().detach()
+            return output
+        handle = layer.mlp.register_forward_hook(hook)
+        return handle
 
-    @abstractmethod
+    def _register_act_hook(self, layer_idx, layer):
+        def hook(module, input, output):
+            # Just detach, don't clone or move to CPU yet
+            self.mlp_activations[Hook.ACT][layer_idx] = input[0].clone().detach()
+            return output
+        handle = layer.mlp.act_fn.register_forward_hook(hook)
+        return handle
+
     def _register_up_hook(self, layer_idx, layer):
-        pass
+        def hook(module, input, output):
+            # Just detach, don't clone or move to CPU yet
+            self.mlp_activations[Hook.UP][layer_idx] = input[0].clone().detach()
+            return output
+        handle = layer.mlp.down_proj.register_forward_hook(hook)
+        return handle
+    
+    def _register_out_hook(self, layer_idx, layer):
+        def hook(module, input, output):
+            # Just detach, don't clone or move to CPU yet
+            self.mlp_activations[Hook.OUT][layer_idx] = output.clone().detach()
+            return output
+        handle = layer.mlp.register_forward_hook(hook)
+        return handle
 
-    @abstractmethod
     def get_layers(self):
-        pass
+        return self.model.get_decoder().layers
 
-
-    @abstractmethod
-    def get_gate_activations(self, layer_idx):
-        """Get combined MLP activations for a layer."""
-        pass
-
-    def register_hooks(self):
+    def register_hooks(self, hooks=(Hook.ACT, Hook.UP, Hook.OUT)):
         """Register forward hooks to capture activations."""
         # Clear any existing hooks
         self.remove_hooks()
         
         # Hook into each transformer layer
-        for i, layer in enumerate(self.get_layers()):            
-            # Capture MLP gate activations (after activation function)
-            if self.has_gate_proj:
-                handle = self._register_gate_hook(i, layer)
+        for i, layer in enumerate(self.get_layers()):   
+            # Hooks capturing inputs to the MLP layer
+            if Hook.IN in hooks and Hook.IN in self.hooks_available:
+                handle = self._register_in_hook(i, layer)
                 if handle is not None:
                     self.handles.append(handle)
-                        
-            # Also capture up_proj activations
-            if self.has_up_proj:
+
+            # Hooks capturing inputs to the activation function      
+            if Hook.ACT in hooks and Hook.ACT in self.hooks_available:
+                handle = self._register_act_hook(i, layer)
+                if handle is not None:
+                    self.handles.append(handle)
+
+            # Hooks capturing inputs to the down projection
+            if Hook.UP in hooks and Hook.UP in self.hooks_available:
                 handle = self._register_up_hook(i, layer)
                 if handle is not None:
                     self.handles.append(handle)
+
+            # Hooks capturing the final MLP output
+            if Hook.OUT in hooks and Hook.OUT in self.hooks_available:
+                handle = self._register_out_hook(i, layer)
+                if handle is not None:
+                    self.handles.append(handle)
+
     
     def remove_hooks(self):
         """Remove all registered hooks."""
@@ -58,92 +95,6 @@ class ActivationCapture(ABC):
     
     def clear_captures(self):
         """Clear captured activations."""
-        self.mlp_activations = {}
-
-
-
-class ActivationCaptureDefault(ActivationCapture):
-    """Helper class to capture activations from model layers."""
-    has_gate_proj: bool = True
-    has_up_proj: bool = True
-
-    def get_layers(self):
-        return self.model.get_decoder().layers
-
-    def _create_mlp_hook(self, layer_idx, proj_type):
-        def hook(module, input, output):
-            key = f"{layer_idx}_{proj_type}"
-            # Just detach, don't clone or move to CPU yet
-            self.mlp_activations[key] = output.clone().detach()
-            return output
-        return hook
-
-    def _register_gate_hook(self, layer_idx, layer):
-        handle = layer.mlp.gate_proj.register_forward_hook(
-            self._create_mlp_hook(layer_idx, 'gate')
-        )
-        return handle
-
-    def _register_up_hook(self, layer_idx, layer):
-        handle = layer.mlp.up_proj.register_forward_hook(
-            self._create_mlp_hook(layer_idx, 'up')
-        )
-        return handle
-    
-    def get_gate_activations(self, layer_idx):
-        gate_key = f"{layer_idx}_gate"
-        if gate_key in self.mlp_activations:
-            gate_act = self.mlp_activations[gate_key]
-            return F.silu(gate_act)
-        return None
-
-    def get_up_activations(self, layer_idx):
-        up_key = f"{layer_idx}_up"
-        if up_key in self.mlp_activations:
-            up_act = self.mlp_activations[up_key]
-            return up_act
-        return None
-
-class ActivationCaptureTraining(ActivationCaptureDefault):
-    """Additional Hidden State capture for training dataset generation"""
-    def __init__(self, model):
-        super().__init__(model)
-        self.hidden_states = {}
-    
-    def _create_hidden_state_hook(self, layer_idx, layer):
-        def hook(module, args, kwargs, output):
-            # args[0] is the input hidden states to the layer
-            if len(args) > 0:
-                # Just detach, don't clone or move to CPU yet
-                self.hidden_states[layer_idx] = args[0].clone().detach()
-            return output
-        return hook
-    
-    def _register_hidden_state_hook(self, layer_idx, layer):
-        handle = layer.register_forward_hook(
-            self._create_hidden_state_hook(layer_idx, layer),
-            with_kwargs=True
-        )
-        return handle
-
-    @override
-    def clear_captures(self):
-        """Clear captured activations."""
-        super().clear_captures()
-        self.hidden_states = {}
-
-    @override
-    def register_hooks(self):
-        """Register forward hooks to capture activations."""
-        # Clear any existing hooks
-        super().register_hooks()
-        # Hook into each transformer layer
-        for i, layer in enumerate(self.get_layers()):            
-            # Capture hidden states before MLP
-            handle = self._register_hidden_state_hook(i, layer)
-            if handle is not None:
-                self.handles.append(handle)
-    
-    def get_hidden_states(self, layer_idx):
-        """Get hidden states for a layer."""
-        return self.hidden_states[layer_idx]
+        self.mlp_activations = {
+            hook: {} for hook in self.hooks_available
+        }

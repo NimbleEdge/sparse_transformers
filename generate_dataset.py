@@ -43,7 +43,7 @@ from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.trainer_utils import set_seed
 
-from src.activation_capture import ActivationCaptureTraining
+from src.activation_capture import Hook
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -120,14 +120,14 @@ def process_batch(
     hidden_states_dict = {}
     mlp_activations_dict = {}
     for layer_idx in range(num_layers):
-        hidden_state = model.activation_capture.get_hidden_states(layer_idx)[0]
+        hidden_state = model.activation_capture.mlp_activations[Hook.IN][layer_idx][0]
         hidden_states_dict[layer_idx] = (
             hidden_state.view(-1, hidden_state.shape[-1])
             .cpu()
             .numpy()
             .astype(np.float32)
         )
-        mlp_activation = model.activation_capture.get_gate_activations(layer_idx)
+        mlp_activation = model.activation_capture.mlp_activations[Hook.ACT][layer_idx]
         mlp_activations_dict[layer_idx] = (
             mlp_activation[0]
             .view(-1, mlp_activation.shape[-1])
@@ -172,8 +172,8 @@ def generate_dataset(
         model = model.to(device)
 
     model.eval()
-    model.activation_capture = ActivationCaptureTraining(model)
-    model.activation_capture.register_hooks()
+    model.activation_capture = model.ACTIVATION_CAPTURE(model)
+    model.activation_capture.register_hooks(hooks=[Hook.IN, Hook.ACT])
 
     # Get model dimensions
     hidden_dim = model.config.hidden_size
