@@ -32,6 +32,8 @@ def parse_args():
                        help="Size of lora predictors to use as percentage of total hidden size")
     parser.add_argument("--sp_layers", default="all", nargs='+',
                        help="Which layers to use sparse predictors for")
+    parser.add_argument("--disable_weight_cache", action="store_true", 
+                        help="Disable weight cache and compute sparse mlp manually")
     return parser.parse_args()
 
 
@@ -57,6 +59,8 @@ def main():
             args.sp_layers = [int(x) for x in args.sp_layers]
         config.lora_size = args.lora_size / 100.0
         config.sp_layers = args.sp_layers
+        if args.disable_weight_cache:
+            config.use_weight_cache = False
         model = AutoModelForCausalLM.from_pretrained(config._name_or_path, config=config)
         for layer_idx in model.get_decoder().sp_layers:
             layer = model.get_decoder().layers[layer_idx]
