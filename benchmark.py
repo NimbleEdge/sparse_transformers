@@ -208,9 +208,9 @@ def benchmark_single_prompt(
             
             generated_tokens.append(next_token.item())
             
-            # Check for EOS token
-            if next_token.item() == tokenizer.eos_token_id:
-                break
+            # Check for EOS token - remove to ensure benchmarking is consistent
+            #if next_token.item() == tokenizer.eos_token_id:
+            #    break
             
             # Update input for next iteration
             if use_cache:

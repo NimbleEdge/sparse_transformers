@@ -61,7 +61,8 @@ class LlamaSkipDecoderLayer(SkipDecoderLayer):
             config.intermediate_size,
             config.sparsities[layer_idx],
             config.mlp_bias,
-            config.hidden_act
+            config.hidden_act,
+            getattr(config, 'use_weight_cache', True)
         )
 
 

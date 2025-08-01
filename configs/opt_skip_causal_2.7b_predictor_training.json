@@ -34,6 +34,9 @@
     0.9436734234914184
   ],
   "_name_or_path": "facebook/opt-2.7b",
+  "training": true,
+  "use_optimized_weight_cache": true,
+  "return_dict": true,
   "_remove_final_layer_norm": false,
   "activation_dropout": 0.0,
   "activation_function": "relu",

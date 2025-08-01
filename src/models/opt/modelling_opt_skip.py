@@ -23,6 +23,7 @@ from transformers.modeling_layers import GradientCheckpointingLayer
 from transformers.utils import logging, is_torch_flex_attn_available
 from transformers.cache_utils import Cache, DynamicCache
 from transformers.generation import GenerationMixin
+from transformers.activations import ACT2FN
 
 if is_torch_flex_attn_available():
     from torch.nn.attention.flex_attention import BlockMask
@@ -31,9 +32,7 @@ if is_torch_flex_attn_available():
 
 # Import C++ extensions
 from sparse_transformers import (
-    sparse_mlp_forward,
     WeightCache,
-    approx_topk_threshold
 )
 
 from src.models.opt.configuration_opt_skip import OPTSkipConnectionConfig
@@ -59,13 +58,17 @@ class OPTMLP(nn.Module):    # double check config stuff later
 
 
 class OPTSkipMLP(nn.Module):
-    def __init__(self, hidden_size: int, intermediate_size: int, sparsity: float, bias: bool = False):
+    def __init__(self, hidden_size: int, intermediate_size: int, sparsity: float, bias: bool = False, act_fn="relu", use_weight_cache=True):
+
         super().__init__()
         self.up_proj = nn.Linear(hidden_size, intermediate_size, bias=bias)
         self.down_proj = nn.Linear(intermediate_size, hidden_size, bias=bias)
         self.sparsity = sparsity
         self.hidden_size = hidden_size
         self.intermediate_size = intermediate_size
+        self.act_fn_name = act_fn
+        self.act_fn = ACT2FN[act_fn]
+        self.use_weight_cache = use_weight_cache
         
         # Initialize mask but defer WeightCache creation until post_init
         self.init_mask = torch.ones(intermediate_size, dtype=torch.bool)
@@ -101,18 +104,31 @@ class OPTSkipMLP(nn.Module):
                 self.init_mask = self.init_mask.to(device)
         return result
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = sparse_mlp_forward(
-            x.detach(), 
-            self.weight_cache.get_concat_weight(),
-            self.weight_cache.get_active_down_weight(),
-            self.down_proj_buffer,
-            self.combined_proj_buffer,
-            "relu",
-            False
-        )
+    def forward(self, x: torch.Tensor, use_sparse: bool = True) -> torch.Tensor:
+        if use_sparse:
+            if self.use_weight_cache:
+                return self._forward_sparse_weight_cache(x)
+            else:
+                return self._forward_sparse_no_cache(x)
+        else:
+            return self._forward_dense(x)
+    
+    def _forward_sparse_weight_cache(self, x: torch.Tensor) -> torch.Tensor:
+        up = self.act_fn(x.matmul(self.weight_cache.get_concat_weight().t()))
+        out = up.matmul(self.weight_cache.get_active_down_weight().t())
+        return out
+
+    def _forward_sparse_no_cache(self, x: torch.Tensor) -> torch.Tensor:
+        # this is inefficient and will need to be updated if used for anything other than debugging
+        up = self.act_fn(self.up_proj(x))
+        if self.weight_mask:
+            up = up * self.weight_mask
+        out = self.down_proj(up)
         return out
     
+    def _forward_dense(self, x: torch.Tensor) -> torch.Tensor:
+        return self.down_proj(self.act_fn(self.up_proj(x)))
+
 
 class OPTSkipDecoderLayer(SkipDecoderLayer):
     def _init_components(self, config, layer_idx):
@@ -145,6 +161,9 @@ class OPTSkipDecoderLayer(SkipDecoderLayer):
             config.intermediate_size,
             config.sparsity,
             config.enable_bias,
+            "relu",
+            getattr(config, 'use_weight_cache', True)
+
         )
 
     @property
@@ -190,7 +209,8 @@ class OPTSkipDecoderLayer(SkipDecoderLayer):
         if self.do_layer_norm_before:
             hidden_states = self.self_attn_layer_norm(hidden_states)
 
-        if self.is_sparse:  # Use PyTorch's built-in training flag
+        use_sparse = self.is_sparse and hidden_states.size(1) == 1  # use dense computation for prefill stage and sparse for cached inference
+        if use_sparse: 
             self._compute_binary_mask(hidden_states)
 
         # Self Attention
@@ -220,7 +240,10 @@ class OPTSkipDecoderLayer(SkipDecoderLayer):
         if self.do_layer_norm_before:
             hidden_states = self.final_layer_norm(hidden_states)
 
-        hidden_states = self.mlp(hidden_states)
+        if self.is_sparse:
+            hidden_states = self.mlp(hidden_states, use_sparse=use_sparse)  # type: ignore
+        else:
+            hidden_states = self.mlp(hidden_states)  # type: ignore
         hidden_states = nn.functional.dropout(hidden_states, p=self.dropout, training=self.training)
 
         hidden_states = (residual + hidden_states).view(hidden_states_shape)

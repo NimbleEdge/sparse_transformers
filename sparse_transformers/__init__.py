@@ -24,11 +24,11 @@ torch._C._jit_set_profiling_mode(True)
 torch.classes.load_library(os.path.join(os.path.dirname(__file__), "sparse_transformers.so"))
 
 # Only define these if the extension loaded successfully
-sparse_mlp_forward = torch.ops.sparse_mlp.forward
+#sparse_mlp_forward = torch.ops.sparse_mlp.forward
 WeightCache = torch.classes.sparse_mlp.WeightCache
-approx_topk_threshold = torch.ops.sparse_mlp.approx_topk_threshold
+#approx_topk_threshold = torch.ops.sparse_mlp.approx_topk_threshold
 __all__ = [
-    'sparse_mlp_forward',
+#    'sparse_mlp_forward',
     'WeightCache',
-    'approx_topk_threshold'
+#    'approx_topk_threshold'
 ]

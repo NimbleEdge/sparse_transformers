@@ -24,7 +24,6 @@ from transformers.models.gemma3n.modeling_gemma3n import(
     Gemma3nTextRotaryEmbedding, Gemma3nTextScaledWordEmbedding
 )
 
-from sparse_transformers import sparse_mlp_forward
 
 from src.models.gemma3n.configuration_gemma_skip import Gemma3nSkipConnectionConfig
 from src.modeling_skip import SkipMLP, SkipDecoderLayer, build_skip_connection_model, build_skip_connection_model_for_causal_lm
